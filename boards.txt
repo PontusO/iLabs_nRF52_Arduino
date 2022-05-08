@@ -3,6 +3,68 @@ menu.debug=Debug
 menu.debug_output=Debug Output
 
 # -----------------------------------
+# iLabs Challenger 840 BLE
+# -----------------------------------
+challenger840ble.name=iLabs Challenger 840 BLE
+
+# VID/PID for Bootloader, Arduino & CircuitPython
+challenger840ble.vid.0=0x239A
+challenger840ble.pid.0=0x8029
+challenger840ble.vid.1=0x239A
+challenger840ble.pid.1=0x0029
+challenger840ble.vid.2=0x239A
+challenger840ble.pid.2=0x002A
+challenger840ble.vid.3=0x239A
+challenger840ble.pid.3=0x802A
+
+# Upload
+challenger840ble.bootloader.tool=bootburn
+challenger840ble.upload.tool=nrfutil
+challenger840ble.upload.protocol=nrfutil
+challenger840ble.upload.use_1200bps_touch=true
+challenger840ble.upload.wait_for_upload_port=true
+challenger840ble.upload.maximum_size=815104
+challenger840ble.upload.maximum_data_size=237568
+
+# Build
+challenger840ble.build.mcu=cortex-m4
+challenger840ble.build.f_cpu=64000000
+challenger840ble.build.board=NRF52840_CHALLENGER
+challenger840ble.build.core=nRF5
+challenger840ble.build.variant=challenger_840_ble
+challenger840ble.build.usb_manufacturer="iLabs"
+challenger840ble.build.usb_product="Challenger 840 BLE"
+challenger840ble.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
+challenger840ble.build.ldscript=nrf52840_s140_v6.ld
+challenger840ble.build.vid=0x239A
+challenger840ble.build.pid=0x8029
+
+# SoftDevice Menu
+challenger840ble.menu.softdevice.s140v6=S140 6.1.1
+challenger840ble.menu.softdevice.s140v6.build.sd_name=s140
+challenger840ble.menu.softdevice.s140v6.build.sd_version=6.1.1
+challenger840ble.menu.softdevice.s140v6.build.sd_fwid=0x00B6
+
+# Debug Menu
+challenger840ble.menu.debug.l0=Level 0 (Release)
+challenger840ble.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
+challenger840ble.menu.debug.l1=Level 1 (Error Message)
+challenger840ble.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
+challenger840ble.menu.debug.l2=Level 2 (Full Debug)
+challenger840ble.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
+challenger840ble.menu.debug.l3=Level 3 (Segger SystemView)
+challenger840ble.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
+challenger840ble.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
+
+# Debug Output Menu
+challenger840ble.menu.debug_output.serial=Serial
+challenger840ble.menu.debug_output.serial.build.logger_flags=-DCFG_LOGGER=0
+challenger840ble.menu.debug_output.serial1=Serial1
+challenger840ble.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
+challenger840ble.menu.debug_output.rtt=Segger RTT
+challenger840ble.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# -----------------------------------
 # Adafruit Feather nRF52832
 # -----------------------------------
 feather52832.name=Adafruit Feather nRF52832
