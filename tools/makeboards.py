@@ -166,3 +166,6 @@ make_board("pca10056", "pca10056", "Nordic", "nRF52840 DK", "NRF52840_PCA10056",
 
 make_board("particle_xenon", "particle_xenon", "Particle", "Xenon", "PARTICLE_XENON",
            "0x239A", ["0x8029", "0x0029"])
+
+make_board("challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
+           "0x1209", ["0x7380", "0x7381"])
