@@ -37,8 +37,8 @@ extern "C"
 #endif // __cplusplus
 
 // Number of pins defined in PinDescription array
-#define PINS_COUNT           (31u)
-#define NUM_DIGITAL_PINS     (31u)
+#define PINS_COUNT           (36u)
+#define NUM_DIGITAL_PINS     (36u)
 #define NUM_ANALOG_INPUTS    (8u)
 #define NUM_ANALOG_OUTPUTS   (0u)
 

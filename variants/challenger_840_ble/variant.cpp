@@ -93,4 +93,7 @@ void initVariant()
 
   pinMode(PIN_LDO_CONTROL, OUTPUT);
   digitalWrite(PIN_LDO_CONTROL, HIGH);
+
+  pinMode(PIN_SPI1_CS, OUTPUT);
+  digitalWrite(PIN_SPI1_CS, HIGH);
 }
