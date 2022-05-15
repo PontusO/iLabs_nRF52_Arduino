@@ -1,0 +1,47 @@
+#!/bin/bash
+#
+# Package script the prepares the repo for release
+#
+
+FILE=boards.txt
+PACKAGE=$PWD/../package
+NAME=${PWD##*/}
+VERSION=$1
+ZIP_NAME="ilabs-nrf52-$VERSION.tar.bz2"
+VER_NAME="ilabs-nrf52-$VERSION"
+
+if [ ! -f "$FILE" ]; then
+    echo "Script needs to be executed from repo root, ex: tools/package"
+    exit 1
+fi
+
+if [[ -d "$PACKAGE" ]]; then
+    echo "$PACKAGE already exists so I am removing it."
+    rm -rf $PACKAGE
+fi
+
+# Create package directory
+echo "Creating package directory $PACKAGE"
+mkdir $PACKAGE
+
+# Copy entire structure to package directory
+echo "Copying release structure to package directory"
+cp -r $PWD $PACKAGE
+mv $PACKAGE/$NAME $PACKAGE/$VER_NAME
+
+# Remove stuff that isn't necessary
+rm -rf $PACKAGE/$VER_NAME/.git
+rm -rf $PACKAGE/$VER_NAME/.github
+rm -rf $PACKAGE/$VER_NAME/.gitignore
+rm -rf $PACKAGE/$VER_NAME/.gitmodules
+
+# Update the version information
+sed -i "s/version=.*/version=$VERSION/" $PACKAGE/$VER_NAME/platform.txt
+
+# Pack up for distribution
+tar -C $PACKAGE -cjSf $PACKAGE/$ZIP_NAME $VER_NAME
+
+# Print usefull stuff
+SUM=$(sha256sum  $PACKAGE/$ZIP_NAME | awk '{print $1}')
+echo "\"checksum\": \"SHA-256:$SUM\""
+stat --printf="%s\n" $PACKAGE/$ZIP_NAME 2>/dev/null

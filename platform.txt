@@ -17,7 +17,8 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 name=Adafruit/iLabs nRF52 Boards
-version=1.3.1
+# Don't change manually, this is filled in by the packaging script.
+version=<version_tag>
 
 # Compile variables
 # -----------------
