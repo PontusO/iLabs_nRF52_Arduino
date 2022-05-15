@@ -115,6 +115,13 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 #define PIN_WIRE_SCL         (4u)
 
 /*
+ * On-board QSPI Flash
+ */
+#define EXTERNAL_FLASH_DEVICES   W25Q16JV
+#define EXTERNAL_FLASH_USE_SPI   SPI1
+#define EXTERNAL_FLASH_USE_CS    PIN_SPI1_CS
+
+/*
  * On board on/off controllable LDO
  */
 #define PIN_LDO_CONTROL      (31u)
