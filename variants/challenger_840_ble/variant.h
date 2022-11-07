@@ -51,6 +51,8 @@ extern "C"
 
 #define LED_GREEN            PIN_LED1
 #define LED_BLUE             PIN_LED2
+#define LED_NEOPIXEL         (30u)
+#define NEOPIXEL             LED_NEOPIXEL
 
 #define LED_STATE_ON         1         // State when LED is litted
 
@@ -117,7 +119,6 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 /*
  * On-board QSPI Flash
  */
-#define EXTERNAL_FLASH_DEVICES   W25Q16JV
 #define EXTERNAL_FLASH_USE_SPI   SPI1
 #define EXTERNAL_FLASH_USE_CS    PIN_SPI1_CS
 

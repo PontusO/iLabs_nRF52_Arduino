@@ -113,17 +113,28 @@ def build_debug_output(name):
     print("%s.menu.debug_output.rtt=Segger RTT" % name)
     print("%s.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL" % name)
 
+def build_ext_mem_menu(name, ext_mem):
+    print()
+    print("# External memory size")
+    if not ext_mem == None:
+        i = 0
+        for mem in ext_mem:
+            print("%s.menu.external_mem_size.%s=%s (%s)" % (name, ext_mem[i][0], ext_mem[i][0], ext_mem[i][1]))
+            print("%s.menu.external_mem_size.%s.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=%s" % (name, ext_mem[i][0], ext_mem[i][1]))
+            i += 1
+
 def build_global_menu():
     print("menu.softdevice=SoftDevice")
     print("menu.debug=Debug")
     print("menu.debug_output=Debug Output")
+    print("menu.external_mem_size=External FLASH Memory")
 
-def make_board(name, variant, vendor_name, product_name, boarddefine, vid, pid_list):
+def make_board(name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
     build_header(name, variant, vendor_name, product_name, boarddefine, vid, pid_list)
     build_softdevice(name)
     build_debug(name)
     build_debug_output(name)
-
+    build_ext_mem_menu(name, ext_mem)
 
 build_global_menu()
 
@@ -168,4 +179,4 @@ make_board("particle_xenon", "particle_xenon", "Particle", "Xenon", "PARTICLE_XE
            "0x239A", ["0x8029", "0x0029"])
 
 make_board("challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
-           "0x1209", ["0x7380", "0x7381"])
+           "0x1209", ["0x7380", "0x7381"], [["0MB", "None"], ["2MB", "W25Q16FW"], ["4MB", "W25Q32FV"], ["8MB", "W25Q64JV_IM"]])

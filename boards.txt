@@ -1,6 +1,7 @@
 menu.softdevice=SoftDevice
 menu.debug=Debug
 menu.debug_output=Debug Output
+menu.external_mem_size=External FLASH Memory
 
 # -----------------------------------
 # Adafruit Feather nRF52832
@@ -54,6 +55,8 @@ feather52832.menu.debug_output.serial1=Serial1
 feather52832.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 feather52832.menu.debug_output.rtt=Segger RTT
 feather52832.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 # -----------------------------------
 # Adafruit Feather nRF52840 Express
@@ -117,6 +120,8 @@ feather52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_T
 feather52840.menu.debug_output.rtt=Segger RTT
 feather52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # Adafruit Feather nRF52840 Sense
 # -----------------------------------
@@ -178,6 +183,8 @@ feather52840sense.menu.debug_output.serial1=Serial1
 feather52840sense.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 feather52840sense.menu.debug_output.rtt=Segger RTT
 feather52840sense.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 # -----------------------------------
 # Adafruit ItsyBitsy nRF52840 Express
@@ -241,6 +248,8 @@ itsybitsy52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG
 itsybitsy52840.menu.debug_output.rtt=Segger RTT
 itsybitsy52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # Adafruit Circuit Playground Bluefruit
 # -----------------------------------
@@ -300,6 +309,8 @@ cplaynrf52840.menu.debug_output.serial1=Serial1
 cplaynrf52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 cplaynrf52840.menu.debug_output.rtt=Segger RTT
 cplaynrf52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 # -----------------------------------
 # Adafruit CLUE
@@ -361,6 +372,8 @@ cluenrf52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_T
 cluenrf52840.menu.debug_output.rtt=Segger RTT
 cluenrf52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # Adafruit LED Glasses Driver nRF52840
 # -----------------------------------
@@ -421,6 +434,8 @@ ledglasses_nrf52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 
 ledglasses_nrf52840.menu.debug_output.rtt=Segger RTT
 ledglasses_nrf52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # Raytac nRF52840 Dongle
 # -----------------------------------
@@ -480,6 +495,8 @@ mdbt50qrx.menu.debug_output.serial1=Serial1
 mdbt50qrx.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 mdbt50qrx.menu.debug_output.rtt=Segger RTT
 mdbt50qrx.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 # -----------------------------------
 # Adafruit Metro nRF52840 Express
@@ -542,6 +559,8 @@ metro52840.menu.debug_output.serial1=Serial1
 metro52840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 metro52840.menu.debug_output.rtt=Segger RTT
 metro52840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 
 # -------------------------------------------------------
@@ -608,6 +627,8 @@ pca10056.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_
 pca10056.menu.debug_output.rtt=Segger RTT
 pca10056.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # Particle Xenon
 # -----------------------------------
@@ -666,6 +687,8 @@ particle_xenon.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG
 particle_xenon.menu.debug_output.rtt=Segger RTT
 particle_xenon.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
+# External memory size
+
 # -----------------------------------
 # iLabs Challenger 840 BLE
 # -----------------------------------
@@ -723,3 +746,13 @@ challenger_840_ble.menu.debug_output.serial1=Serial1
 challenger_840_ble.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 challenger_840_ble.menu.debug_output.rtt=Segger RTT
 challenger_840_ble.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
+challenger_840_ble.menu.external_mem_size.0MB=0MB (None)
+challenger_840_ble.menu.external_mem_size.0MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=None
+challenger_840_ble.menu.external_mem_size.2MB=2MB (W25Q16FW)
+challenger_840_ble.menu.external_mem_size.2MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q16FW
+challenger_840_ble.menu.external_mem_size.4MB=4MB (W25Q32FV)
+challenger_840_ble.menu.external_mem_size.4MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q32FV
+challenger_840_ble.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
+challenger_840_ble.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM

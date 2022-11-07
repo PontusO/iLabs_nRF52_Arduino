@@ -1,5 +1,9 @@
 # Adafruit nRF52 Arduino Core Changelog
 
+## 1.3.101 - 2022.11.07
+- Pulled latest changes from Adafruit repo
+- Added support for selecting external memory size from the menu
+
 ## 1.2.0
 
 - Add readResetReason()
@@ -96,7 +100,7 @@ A new class BLESecurity (access with Bluefruit.Security) is added to handle secu
 
 ### Other Changes
 
-**BLECentral** 
+**BLECentral**
 
 - will automatically use stored Long Term Key to secure connection if paired/bonded with device previously
 
@@ -246,7 +250,7 @@ Special thanks to @henrygab, @pyro9, @geeksville for contributing and helping wi
 - Enhance Software Timer
 
 ### BLE
- 
+
 - Increase sd attribute table size from 0x800 to 0xC00, increase linker memory for SD 840 from 3400 to 6000
 - Add Adafruit BLE Service library (used by Circuit Playground Bluefruit App): Temperature, Addressable Pixel, Accel, Button
   - Add `cplay_ble.ino` example sketch
@@ -365,7 +369,7 @@ Special thanks to @henrygab, @pyro9, @geeksville for contributing and helping wi
 
 ## 0.10.1
 
-This release added multiple concurrent peripheral connections support, allow Bluefruit device to multiple central (phones/PC) simultaneously. It introduces new BLE class: BLEPeriph, BLEConnection, remove BLEGap, refactor/rename/move functions and callbacks.     
+This release added multiple concurrent peripheral connections support, allow Bluefruit device to multiple central (phones/PC) simultaneously. It introduces new BLE class: BLEPeriph, BLEConnection, remove BLEGap, refactor/rename/move functions and callbacks.
 
 - Fixed Servo detach issue
 - Fixed pulseIn() compile issue: implement countPulseASM() using C instead of ASM
@@ -387,12 +391,12 @@ This release added multiple concurrent peripheral connections support, allow Blu
   - Bluefruit.begin() return type is changed from err_t to bool
   - Bluefruit.setConnectCallback()/setDisconnectCallback() are replaced by BLEPeriph's setConnectCallback()/setDisconnectCallback()
 - Introduce BLEConnection class (Bluefruit.Connection(conn)) to mange both peripheral and central connections
-  - Added setRssiCallback(), monitorRssi(), getRssi(), stopRssi() for tracking rssi of a connection. `rssi_poll` and `rssi_callback` are added as example sketches 
+  - Added setRssiCallback(), monitorRssi(), getRssi(), stopRssi() for tracking rssi of a connection. `rssi_poll` and `rssi_callback` are added as example sketches
 - Remove BLEGap, API functions are taken by Bluefruit, BLEPeriph, BLECentral, BLEConnection
   - Gap.setAddr()/getAddr() are replaced by Bluefruit.setAddr()/getAddr()
   - Gap.requestPairing() is replaced by Bluefruit.requestPairing(), conn_handle parameter is also added
   - Most of other functions of BLEGap are replaced by BLEConnection's one
-- BLECharacteristic 
+- BLECharacteristic
   - Change callback signature's parameter from `BLECharacteristic&` to `BLECharacteristic*`
   - conn_handle is added to all callbacks to support multiple peripheral's link
   - Use AdaCallback thread for BLECharacteristic callbacks
@@ -401,7 +405,7 @@ This release added multiple concurrent peripheral connections support, allow Blu
   - Removed offset parameter in write callback signature
 - BLEUart
   - Added conn_handle to API and callbacks
-  - Removed auto flush TXD() with timer, user must call flushTXD() should bufferTXD() is enabled. 
+  - Removed auto flush TXD() with timer, user must call flushTXD() should bufferTXD() is enabled.
 - BLEHidAdafruit
   - Removed keyboardReport() variant with flat keycode parameters
   - Added conn_handle parameter to keyboard led callback
@@ -496,7 +500,7 @@ This release added multiple concurrent peripheral connections support, allow Blu
 - BLEClientCharacteristic
   - Added setIndicateCallback(), issue #113
   - Added useAdaCallback option to setNotifyCallback(), setIndicateCallback()
-  - Change notify callback signature from 
+  - Change notify callback signature from
 notify_cb(BLEClientCharacteristic& chr, uint8_t* data, uint16_t len) to notify_cb(BLEClientCharacteristic* chr, uint8_t* data, uint16_t len)
 
 ## 0.8.1
@@ -544,7 +548,7 @@ notify_cb(BLEClientCharacteristic& chr, uint8_t* data, uint16_t len) to notify_c
 
 ## Bug Fixs
 
-- Fixed #92 PWM incorrect logic check, thanks to @burbankb 
+- Fixed #92 PWM incorrect logic check, thanks to @burbankb
 - Fixed issue #108 with GPIO output when reset.
 - Fixed an discovery bug introduced in 0.7.5
 - Fixed #99 setStopCallback() for BLEScanner is not implemented
