@@ -117,10 +117,21 @@ static const uint8_t SCK  = PIN_SPI_SCK ;
 #define PIN_WIRE_SCL         (4u)
 
 /*
- * On-board QSPI Flash
+ * On-board SPI Flash
  */
 #define EXTERNAL_FLASH_USE_SPI   SPI1
 #define EXTERNAL_FLASH_USE_CS    PIN_SPI1_CS
+/*
+ * Also needed here are blank declarations of QSPI pins for the Adafruit
+ * libraries to build properly. This way you can still create another instance
+ * of the driver library to connect to another external QSPI chip.
+ */
+#define PIN_QSPI_SCK             -1
+#define PIN_QSPI_CS              -1
+#define PIN_QSPI_IO0             -1
+#define PIN_QSPI_IO1             -1
+#define PIN_QSPI_IO2             -1
+#define PIN_QSPI_IO3             -1
 
 /*
  * On board on/off controllable LDO
