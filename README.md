@@ -1,6 +1,12 @@
-# Arduino Core for Adafruit Bluefruit nRF52 Boards
+# Arduino Core for Adafruit Bluefruit/iLabs Challenger nRF52 Boards
 
 [![Build Status](https://github.com/adafruit/Adafruit_nRF52_Arduino/workflows/Build/badge.svg)](https://github.com/adafruit/Adafruit_nRF52_Arduino/actions)
+
+This repository fork include board support for iLabs nRF52 boards in addition the Adafruit boards. This repo should alway be in sync with the parent report at Adafruit so if you find that it is't give us a shout out and will make sure everything is updated.
+
+iLabs boards that are currently supported:
+
+- [Challenger 840 BLE (all memory sizes)](https://ilabs.se/challenger-840-ble-datasheet)
 
 This repository contains the Arduino BSP for Adafruit Bluefruit nRF52 series:
 
