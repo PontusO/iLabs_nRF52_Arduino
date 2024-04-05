@@ -201,6 +201,9 @@ thirdparty_boards_list = [
 
     ["challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
            "0x1209", ["0x7380", "0x7381"], [["0MB", "None"], ["2MB", "W25Q16FW"], ["4MB", "W25Q32FV"], ["8MB", "W25Q64JV_IM"]]],
+
+    ["connectivity_840", "connectivity_840", "iLabs", "Connectivity 840", "CONNECTIVITY_840",
+           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]]],
 ]
 
 for b in thirdparty_boards_list:

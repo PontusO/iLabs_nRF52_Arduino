@@ -1,12 +1,7 @@
 menu.softdevice=SoftDevice
-<<<<<<< HEAD
 menu.debug=Debug
 menu.debug_output=Debug Output
 menu.external_mem_size=External FLASH Memory
-=======
-menu.debug=Debug Level
-menu.debug_output=Debug Port
->>>>>>> upstream/master
 
 # -----------------------------------
 # Adafruit Feather nRF52832
@@ -256,6 +251,8 @@ feather_nrf52840_sense_tft.menu.debug_output.serial1=Serial1
 feather_nrf52840_sense_tft.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
 feather_nrf52840_sense_tft.menu.debug_output.rtt=Segger RTT
 feather_nrf52840_sense_tft.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
 
 # -----------------------------------
 # Adafruit ItsyBitsy nRF52840 Express
@@ -797,16 +794,17 @@ challenger_840_ble.build.usb_manufacturer="iLabs"
 challenger_840_ble.build.usb_product="Challenger 840 BLE"
 challenger_840_ble.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
 challenger_840_ble.build.ldscript=nrf52840_s140_v6.ld
+challenger_840_ble.build.openocdscript=scripts/openocd/daplink_nrf52.cfg
 challenger_840_ble.build.vid=0x1209
 challenger_840_ble.build.pid=0x7380
 
-# SoftDevice Menu
+# Menu: SoftDevice
 challenger_840_ble.menu.softdevice.s140v6=S140 6.1.1
 challenger_840_ble.menu.softdevice.s140v6.build.sd_name=s140
 challenger_840_ble.menu.softdevice.s140v6.build.sd_version=6.1.1
 challenger_840_ble.menu.softdevice.s140v6.build.sd_fwid=0x00B6
 
-# Debug Menu
+# Menu: Debug Level
 challenger_840_ble.menu.debug.l0=Level 0 (Release)
 challenger_840_ble.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
 challenger_840_ble.menu.debug.l1=Level 1 (Error Message)
@@ -817,7 +815,7 @@ challenger_840_ble.menu.debug.l3=Level 3 (Segger SystemView)
 challenger_840_ble.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
 challenger_840_ble.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
 
-# Debug Output Menu
+# Menu: Debug Port
 challenger_840_ble.menu.debug_output.serial=Serial
 challenger_840_ble.menu.debug_output.serial.build.logger_flags=-DCFG_LOGGER=0
 challenger_840_ble.menu.debug_output.serial1=Serial1
@@ -834,3 +832,68 @@ challenger_840_ble.menu.external_mem_size.4MB=4MB (W25Q32FV)
 challenger_840_ble.menu.external_mem_size.4MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q32FV
 challenger_840_ble.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
 challenger_840_ble.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM
+
+# -----------------------------------
+# iLabs Connectivity 840
+# -----------------------------------
+connectivity_840.name=iLabs Connectivity 840
+
+# VID/PID for Bootloader, Arduino & CircuitPython
+connectivity_840.vid.0=0x1209
+connectivity_840.pid.0=0x7384
+connectivity_840.vid.1=0x1209
+connectivity_840.pid.1=0x7385
+
+# Upload
+connectivity_840.bootloader.tool=bootburn
+connectivity_840.upload.tool=nrfutil
+connectivity_840.upload.protocol=nrfutil
+connectivity_840.upload.use_1200bps_touch=true
+connectivity_840.upload.wait_for_upload_port=true
+connectivity_840.upload.maximum_size=815104
+connectivity_840.upload.maximum_data_size=237568
+
+# Build
+connectivity_840.build.mcu=cortex-m4
+connectivity_840.build.f_cpu=64000000
+connectivity_840.build.board=CONNECTIVITY_840
+connectivity_840.build.core=nRF5
+connectivity_840.build.variant=connectivity_840
+connectivity_840.build.usb_manufacturer="iLabs"
+connectivity_840.build.usb_product="Connectivity 840"
+connectivity_840.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
+connectivity_840.build.ldscript=nrf52840_s140_v6.ld
+connectivity_840.build.openocdscript=scripts/openocd/daplink_nrf52.cfg
+connectivity_840.build.vid=0x1209
+connectivity_840.build.pid=0x7384
+
+# Menu: SoftDevice
+connectivity_840.menu.softdevice.s140v6=S140 6.1.1
+connectivity_840.menu.softdevice.s140v6.build.sd_name=s140
+connectivity_840.menu.softdevice.s140v6.build.sd_version=6.1.1
+connectivity_840.menu.softdevice.s140v6.build.sd_fwid=0x00B6
+
+# Menu: Debug Level
+connectivity_840.menu.debug.l0=Level 0 (Release)
+connectivity_840.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
+connectivity_840.menu.debug.l1=Level 1 (Error Message)
+connectivity_840.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
+connectivity_840.menu.debug.l2=Level 2 (Full Debug)
+connectivity_840.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
+connectivity_840.menu.debug.l3=Level 3 (Segger SystemView)
+connectivity_840.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
+connectivity_840.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
+
+# Menu: Debug Port
+connectivity_840.menu.debug_output.serial=Serial
+connectivity_840.menu.debug_output.serial.build.logger_flags=-DCFG_LOGGER=0
+connectivity_840.menu.debug_output.serial1=Serial1
+connectivity_840.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
+connectivity_840.menu.debug_output.rtt=Segger RTT
+connectivity_840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+
+# External memory size
+connectivity_840.menu.external_mem_size.0MB=0MB (None)
+connectivity_840.menu.external_mem_size.0MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=None
+connectivity_840.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
+connectivity_840.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM
