@@ -7,6 +7,7 @@ This repository fork include board support for iLabs nRF52 boards in addition th
 iLabs boards that are currently supported:
 
 - [Challenger 840 BLE (all memory sizes)](https://ilabs.se/challenger-840-ble-datasheet)
+- [Connectivity (all memory sizes)](https://ilabs.se/connectivity-840-datasheet)
 
 This repository contains the Arduino BSP for Adafruit Bluefruit nRF52 series:
 
@@ -58,7 +59,7 @@ There are two methods that you can use to install this BSP. We highly recommend 
    cd Adafruit_nRF52_Arduino
    git submodule update --init
    ```
-   
+
  6. Restart the Arduino IDE
  7. Once the BSP is installed, select 'Adafruit Feather nRF52840 Express' from the Tools -> Board menu, which will update your system config to use the right compiler and settings for the nRF52.
 
