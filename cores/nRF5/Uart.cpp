@@ -275,9 +275,15 @@ extern "C"
 }
 
 //------------- Serial2 -------------//
-#if defined(PIN_SERIAL2_RX) && defined(PIN_SERIAL2_TX)
+#if defined(PIN_SERIAL2_RX) && defined(PIN_SERIAL2_TX) && \
+    defined(PIN_SERIAL2_CTS) && defined(PIN_SERIAL2_RTS)
+Uart Serial2( NRF_UARTE1, UARTE1_IRQn, PIN_SERIAL2_RX, PIN_SERIAL2_TX,
+              PIN_SERIAL2_CTS, PIN_SERIAL2_RTS );
+#elif defined(PIN_SERIAL2_RX) && defined(PIN_SERIAL2_TX)
 Uart Serial2( NRF_UARTE1, UARTE1_IRQn, PIN_SERIAL2_RX, PIN_SERIAL2_TX );
+#endif
 
+#if defined(PIN_SERIAL2_RX) && defined(PIN_SERIAL2_TX)
 extern "C"
 {
   void UARTE1_IRQHandler()
