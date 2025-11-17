@@ -138,9 +138,9 @@ def build_global_menu():
     print("menu.debug_output=Debug Output")
     print("menu.external_mem_size=External FLASH Memory")
 
-def make_board(name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
-    build_header(name, variant, vendor_name, product_name, boarddefine, vid, pid_list)
-    build_softdevice(name)
+def make_board(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
+    build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list)
+    build_softdevice(mcu, name)
     build_debug(name)
     build_debug_output(name)
     build_ext_mem_menu(name, ext_mem)
@@ -189,8 +189,8 @@ adafruit_boards_list = [
     #            "0x239A", ["0x8029", "0x0029", "0x002A", "0x802A"]],
 ]
 
-for b in adafruit_boards_list:
-    make_board(*b)
+#for b in adafruit_boards_list:
+#    make_board(*b)
 
 # ------------------------------
 # 3rd Party Boards
@@ -202,18 +202,21 @@ print("# -------------------------------------------------------")
 print("# Boards that aren't made by Adafruit")
 print("# and are not officially supported")
 print("# -------------------------------------------------------")
-
+#make_board(name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
 thirdparty_boards_list = [
-    ["pca10056", "pca10056", "Nordic", "nRF52840 DK", "NRF52840_PCA10056",
+    [52840, "pca10056", "pca10056", "Nordic", "nRF52840 DK", "NRF52840_PCA10056",
      "0x239A", ["0x8029", "0x0029"]],
 
-    ["particle_xenon", "particle_xenon", "Particle", "Xenon", "PARTICLE_XENON",
+    [52840, "particle_xenon", "particle_xenon", "Particle", "Xenon", "PARTICLE_XENON",
      "0x239A", ["0x8029", "0x0029"]],
 
-    ["challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
+    [52840, "challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
            "0x1209", ["0x7380", "0x7381"], [["0MB", "None"], ["2MB", "W25Q16FW"], ["4MB", "W25Q32FV"], ["8MB", "W25Q64JV_IM"]]],
 
-    ["connectivity_840", "connectivity_840", "iLabs", "Connectivity 840", "CONNECTIVITY_840",
+    [52840, "connectivity_840", "connectivity_840", "iLabs", "Connectivity 840", "CONNECTIVITY_840",
+           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]]],
+
+    [52840, "mithings-modem", "mithings-modem", "iLabs", "MiThings modem board", "MITHINGS_MODEM",
            "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]]],
 ]
 
