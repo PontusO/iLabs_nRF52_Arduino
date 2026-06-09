@@ -29,7 +29,14 @@
 #include "delay.h"
 #include "rtos.h"
 
-#ifdef NRF52840_XXAA
+#if defined(ARDUINO_CONNECTIVITY_840) || defined(ARDUINO_CHALLENGER_840_BLE)
+  // iLabs/QSPI-variant bootloader is at 0xF0000, not the stock 0xF4000.
+  // flash_nrf5x_write() below uses this as a "do not write above" ceiling;
+  // if it stays at 0xF4000 the guard lets writes land in 0xF0000-0xF3FFF
+  // and erases the bootloader's reset vector. Keep in lockstep with
+  // LFS_FLASH_ADDR + LFS_FLASH_TOTAL_SIZE in InternalFileSystem.cpp.
+  #define BOOTLOADER_ADDR        0xF0000
+#elif defined(NRF52840_XXAA)
   #define BOOTLOADER_ADDR        0xF4000
 #else
   #define BOOTLOADER_ADDR        0x74000
