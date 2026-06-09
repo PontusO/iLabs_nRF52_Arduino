@@ -1,47 +1,213 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Package script the prepares the repo for release
+# Package the BSP for release.
+#
+# Usage:
+#   tools/package <version> [options]
+#
+# Examples:
+#   tools/package 1.7.101                  # bump + commit + tag, build tarball
+#   tools/package 1.7.101 --no-tag         # build tarball only, don't touch git
+#   tools/package 1.7.101 --release        # also push tag + create GitHub release
+#
+# Options:
+#   --no-tag         Skip in-tree version bump, commit, and tag. Tarball is built
+#                    from current HEAD with the version sed-rewritten only inside
+#                    the staged copy (legacy behavior, useful for dry runs).
+#   --release        After packaging, push the current branch + tag and create a
+#                    GitHub release with the tarball attached. Requires `gh`.
+#   --format gz|bz2  Archive compression. Default: gz (Adafruit/Arduino convention).
+#   --remote NAME    Git remote to push to with --release (default: origin).
 #
 
-FILE=boards.txt
-PACKAGE=$PWD/../package
-NAME=${PWD##*/}
-VERSION=$1
-ZIP_NAME="ilabs-nrf52-$VERSION.tar.bz2"
-VER_NAME="ilabs-nrf52-$VERSION"
+set -euo pipefail
 
-if [ ! -f "$FILE" ]; then
-    echo "Script needs to be executed from repo root, ex: tools/package"
+# ---------- arg parsing ----------
+if [[ $# -lt 1 ]]; then
+    echo "Usage: tools/package <version> [--no-tag] [--release] [--format gz|bz2] [--remote NAME]" >&2
     exit 1
 fi
 
-if [[ -d "$PACKAGE" ]]; then
-    echo "$PACKAGE already exists so I am removing it."
-    rm -rf $PACKAGE
+VERSION=$1; shift
+NO_TAG=0
+DO_RELEASE=0
+FORMAT=gz
+REMOTE=origin
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-tag)  NO_TAG=1 ;;
+        --release) DO_RELEASE=1 ;;
+        --format)  FORMAT=${2:?--format needs a value}; shift ;;
+        --remote)  REMOTE=${2:?--remote needs a value}; shift ;;
+        *) echo "Unknown option: $1" >&2; exit 1 ;;
+    esac
+    shift
+done
+
+if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
+    echo "Error: version '$VERSION' is not semver (e.g. 1.7.101)" >&2
+    exit 1
 fi
 
-# Create package directory
-echo "Creating package directory $PACKAGE"
-mkdir $PACKAGE
+case "$FORMAT" in
+    gz)  TAR_COMPRESS=-z; EXT=tar.gz ;;
+    bz2) TAR_COMPRESS=-j; EXT=tar.bz2 ;;
+    *)   echo "Error: --format must be gz or bz2" >&2; exit 1 ;;
+esac
 
-# Copy entire structure to package directory
-echo "Copying release structure to package directory"
-cp -r $PWD $PACKAGE
-mv $PACKAGE/$NAME $PACKAGE/$VER_NAME
+# ---------- locate repo ----------
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
 
-# Remove stuff that isn't necessary
-rm -rf $PACKAGE/$VER_NAME/.git
-rm -rf $PACKAGE/$VER_NAME/.github
-rm -rf $PACKAGE/$VER_NAME/.gitignore
-rm -rf $PACKAGE/$VER_NAME/.gitmodules
+VER_NAME="ilabs-nrf52-${VERSION}"
+ARCHIVE_NAME="${VER_NAME}.${EXT}"
+TAG="v${VERSION}"
+OUT_DIR="${REPO_ROOT}/../package"
 
-# Update the version information
-sed -i "s/version=.*/version=$VERSION/" $PACKAGE/$VER_NAME/platform.txt
+# ---------- preflight ----------
+if [[ ! -f boards.txt || ! -f platform.txt ]]; then
+    echo "Error: not in BSP root (boards.txt / platform.txt missing)" >&2
+    exit 1
+fi
 
-# Pack up for distribution
-tar -C $PACKAGE -cjSf $PACKAGE/$ZIP_NAME $VER_NAME
+if [[ "$NO_TAG" -eq 0 ]]; then
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        echo "Error: working tree has uncommitted changes. Commit them first, or pass --no-tag." >&2
+        git status --short
+        exit 1
+    fi
+    if git rev-parse -q --verify "refs/tags/${TAG}" >/dev/null; then
+        echo "Error: tag ${TAG} already exists" >&2
+        exit 1
+    fi
+fi
 
-# Print usefull stuff
-SUM=$(sha256sum  $PACKAGE/$ZIP_NAME | awk '{print $1}')
-echo "\"checksum\": \"SHA-256:$SUM\""
-stat --printf="%s\n" $PACKAGE/$ZIP_NAME 2>/dev/null
+if [[ "$DO_RELEASE" -eq 1 ]] && ! command -v gh >/dev/null; then
+    echo "Error: --release requires the GitHub CLI (gh) to be installed and authenticated" >&2
+    exit 1
+fi
+
+# ---------- rollback trap ----------
+# Stage advances after each step that mutates persistent state. The trap inspects
+# it to undo only what we actually did.
+STAGE=init
+rollback() {
+    local rc=$?
+    set +e
+    [[ $rc -eq 0 ]] && return
+    echo >&2
+    echo "Script failed (exit $rc) at stage='${STAGE}'. Rolling back..." >&2
+    case "$STAGE" in
+        bumped)
+            git checkout -- platform.txt && echo "  - reverted platform.txt bump" >&2
+            rm -f platform.txt.bak
+            rm -rf "${OUT_DIR}"
+            ;;
+        committed)
+            git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
+            rm -rf "${OUT_DIR}"
+            ;;
+        tagged)
+            git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
+            git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
+            rm -rf "${OUT_DIR}"
+            ;;
+        pushed)
+            echo "  - commit + tag already pushed to ${REMOTE}; remote state left intact" >&2
+            echo "  - tarball kept at ${OUT_DIR}/${ARCHIVE_NAME} for manual 'gh release create' retry" >&2
+            ;;
+        *)
+            rm -rf "${OUT_DIR}"
+            ;;
+    esac
+}
+trap rollback EXIT
+
+# Submodule contents MUST be physically present in the tarball — Board Manager
+# unpacks a flat tree and has no concept of submodules.
+echo "Initialising submodules..."
+git submodule update --init --recursive
+
+# ---------- version bump + tag ----------
+if [[ "$NO_TAG" -eq 0 ]]; then
+    echo "Bumping platform.txt to version=${VERSION}"
+    sed -i.bak "s/^version=.*/version=${VERSION}/" platform.txt
+    rm -f platform.txt.bak
+    STAGE=bumped
+
+    git add platform.txt
+    git commit -m "Release v${VERSION}"
+    STAGE=committed
+
+    git tag -a "${TAG}" -m "Release v${VERSION}"
+    STAGE=tagged
+    echo "Created commit + tag ${TAG}"
+fi
+
+# ---------- stage ----------
+echo "Staging tree to ${OUT_DIR}/${VER_NAME}"
+rm -rf "${OUT_DIR}"
+mkdir -p "${OUT_DIR}/${VER_NAME}"
+
+# Export only tracked files at HEAD (drops build litter, .git, .vscode, .idea, etc.)
+git archive --format=tar HEAD | tar -x -C "${OUT_DIR}/${VER_NAME}"
+
+# git archive has no native --recurse-submodules flag, so walk them manually
+# and archive each into its $displaypath under the stage dir.
+export PKG_STAGE="${OUT_DIR}/${VER_NAME}"
+git submodule foreach --recursive --quiet \
+    'git archive --format=tar --prefix="$displaypath/" HEAD | tar -x -C "$PKG_STAGE"'
+unset PKG_STAGE
+
+# Drop dev-only files that have no role in the installed BSP. Submodules ship
+# their own .github / .gitignore / library.json etc., so sweep recursively.
+find "${OUT_DIR}/${VER_NAME}" \
+    \( -name .github -o -name .gitignore -o -name .gitmodules \
+       -o -name .gitattributes -o -name .editorconfig \) \
+    -prune -exec rm -rf {} +
+
+# --no-tag path: in-tree platform.txt wasn't bumped, so patch the staged copy.
+if [[ "$NO_TAG" -eq 1 ]]; then
+    sed -i.bak "s/^version=.*/version=${VERSION}/" "${OUT_DIR}/${VER_NAME}/platform.txt"
+    rm -f "${OUT_DIR}/${VER_NAME}/platform.txt.bak"
+fi
+
+# ---------- pack ----------
+echo "Creating ${ARCHIVE_NAME}"
+tar -C "${OUT_DIR}" -c ${TAR_COMPRESS} -f "${OUT_DIR}/${ARCHIVE_NAME}" "${VER_NAME}"
+
+SHA=$(sha256sum "${OUT_DIR}/${ARCHIVE_NAME}" | awk '{print $1}')
+SIZE=$(stat --printf="%s" "${OUT_DIR}/${ARCHIVE_NAME}")
+
+# JSON fragment ready to drop into package_ilabs_index.json
+cat <<EOF
+
+--- board-index entry ---
+{
+  "archiveFileName": "${ARCHIVE_NAME}",
+  "version": "${VERSION}",
+  "checksum": "SHA-256:${SHA}",
+  "size": "${SIZE}"
+}
+EOF
+
+# Record submodule SHAs for traceability.
+echo
+echo "--- pinned submodule SHAs ---"
+git submodule status --recursive | awk '{print $1, $2}'
+
+# ---------- release ----------
+if [[ "$DO_RELEASE" -eq 1 ]]; then
+    echo
+    echo "Pushing branch + ${TAG} to ${REMOTE} and creating GitHub release..."
+    git push "${REMOTE}"
+    git push "${REMOTE}" "${TAG}"
+    STAGE=pushed
+    gh release create "${TAG}" "${OUT_DIR}/${ARCHIVE_NAME}" \
+        --title "v${VERSION}" \
+        --generate-notes
+fi
+
+echo
+echo "Done. Tarball: ${OUT_DIR}/${ARCHIVE_NAME}"

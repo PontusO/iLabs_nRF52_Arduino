@@ -144,8 +144,13 @@ tools.nrfutil.cmd.macosx={runtime.platform.path}/tools/adafruit-nrfutil/macos/ad
 tools.nrfutil.upload.params.verbose=--verbose
 tools.nrfutil.upload.params.quiet=
 tools.nrfutil.upload.args={upload.verbose} dfu serial -pkg "{build.path}/{build.project_name}.zip" -p {serial.port} -b 115200 --singlebank
-tools.nrfutil.upload.pattern="{cmd}" {tools.nrfutil.upload.args}
-tools.nrfutil.upload.pattern.macosx=env LANG=C.UTF-8 LC_ALL=C.UTF-8 "{tools.nrfutil.cmd}" {tools.nrfutil.upload.args}
+# Use the tool-relative {upload.args} form, not the fully-qualified
+# {tools.nrfutil.upload.args} that upstream switched to in March 2026.
+# Arduino IDE 2.x resolves both; Arduino IDE 1.8.x only resolves the
+# relative form inside a tools.* recipe, so the qualified form passes
+# through to adafruit-nrfutil as a literal string and the upload fails.
+tools.nrfutil.upload.pattern="{cmd}" {upload.args}
+tools.nrfutil.upload.pattern.macosx=env LANG=C.UTF-8 LC_ALL=C.UTF-8 "{cmd}" {upload.args}
 
 # ---------------------------------------------------
 # Burning bootloader with either jlink or nrfutil
