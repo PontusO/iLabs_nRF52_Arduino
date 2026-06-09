@@ -113,6 +113,10 @@ rollback() {
             git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
             rm -rf "${OUT_DIR}"
             ;;
+        tagged_only)
+            git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
+            rm -rf "${OUT_DIR}"
+            ;;
         pushed)
             echo "  - commit + tag already pushed to ${REMOTE}; remote state left intact" >&2
             echo "  - tarball kept at ${OUT_DIR}/${ARCHIVE_NAME} for manual 'gh release create' retry" >&2
@@ -131,18 +135,26 @@ git submodule update --init --recursive
 
 # ---------- version bump + tag ----------
 if [[ "$NO_TAG" -eq 0 ]]; then
-    echo "Bumping platform.txt to version=${VERSION}"
-    sed -i.bak "s/^version=.*/version=${VERSION}/" platform.txt
-    rm -f platform.txt.bak
-    STAGE=bumped
+    CURRENT_VERSION=$(sed -n 's/^version=//p' platform.txt)
+    if [[ "$CURRENT_VERSION" == "$VERSION" ]]; then
+        echo "platform.txt already at version=${VERSION}; tagging HEAD without a bump commit."
+        git tag -a "${TAG}" -m "Release v${VERSION}"
+        STAGE=tagged_only
+        echo "Created tag ${TAG}"
+    else
+        echo "Bumping platform.txt from ${CURRENT_VERSION} to ${VERSION}"
+        sed -i.bak "s/^version=.*/version=${VERSION}/" platform.txt
+        rm -f platform.txt.bak
+        STAGE=bumped
 
-    git add platform.txt
-    git commit -m "Release v${VERSION}"
-    STAGE=committed
+        git add platform.txt
+        git commit -m "Release v${VERSION}"
+        STAGE=committed
 
-    git tag -a "${TAG}" -m "Release v${VERSION}"
-    STAGE=tagged
-    echo "Created commit + tag ${TAG}"
+        git tag -a "${TAG}" -m "Release v${VERSION}"
+        STAGE=tagged
+        echo "Created commit + tag ${TAG}"
+    fi
 fi
 
 # ---------- stage ----------
