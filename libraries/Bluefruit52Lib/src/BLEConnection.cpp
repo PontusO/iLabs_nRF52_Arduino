@@ -56,23 +56,23 @@ BLEConnection::BLEConnection(uint16_t conn_hdl, ble_gap_evt_connected_t const* e
 
   _hvn_sem   = xSemaphoreCreateCounting(hvn_qsize, hvn_qsize);
   _wrcmd_sem = xSemaphoreCreateCounting(wrcmd_qsize, wrcmd_qsize);
+  _hvc_sem   = xSemaphoreCreateBinary();
 
   _sec_mode.sm = _sec_mode.lv = 1; // default to open
 
   _bonded = false;
-  _hvc_sem = NULL;
   _hvc_received = false;
 
   _ediv = 0xFFFF;
+
+  _indicate_confirm_timeout = portMAX_DELAY;
 }
 
 BLEConnection::~BLEConnection()
 {
-  vSemaphoreDelete( _hvn_sem );
-  vSemaphoreDelete( _wrcmd_sem );
-
-  //------------- on-the-fly data must be freed -------------//
-  if (_hvc_sem  ) vSemaphoreDelete(_hvc_sem );
+  vSemaphoreDelete(_hvn_sem);
+  vSemaphoreDelete(_wrcmd_sem);
+  vSemaphoreDelete(_hvc_sem);
 }
 
 uint16_t BLEConnection::handle (void)
@@ -285,17 +285,24 @@ bool BLEConnection::requestPairing(void)
   return Bluefruit.Security._authenticate(_conn_hdl);
 }
 
+void BLEConnection::setIndicateConfirmTimeout(uint32_t timeout_ms)
+{
+  _indicate_confirm_timeout = (timeout_ms == UINT32_MAX) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+}
+
+// Must be called BEFORE sd_ble_gatts_hvx() to clear any stale HVC state from a
+// previous indication (e.g. a late HVC that arrived after a timeout). Pairs with
+// waitForIndicateConfirm().
+bool BLEConnection::prepareForIndicateConfirm(void)
+{
+  xSemaphoreTake(_hvc_sem, 0);
+  _hvc_received = false;
+  return true;
+}
+
 bool BLEConnection::waitForIndicateConfirm(void)
 {
-  // on the fly semaphore
-  _hvc_sem = xSemaphoreCreateBinary();
-
-  _hvc_received = false;
-  xSemaphoreTake(_hvc_sem, portMAX_DELAY);
-
-  vSemaphoreDelete(_hvc_sem);
-  _hvc_sem = NULL;
-
+  xSemaphoreTake(_hvc_sem, _indicate_confirm_timeout);
   return _hvc_received;
 }
 
@@ -428,7 +435,7 @@ void BLEConnection::_eventHandler(ble_evt_t* evt)
       LOG_LV2("GATTS", "Confirm received handle = 0x%04X", evt->evt.gatts_evt.params.hvc.handle);
 
       _hvc_received = true;
-      if ( _hvc_sem ) xSemaphoreGive(_hvc_sem);
+      xSemaphoreGive(_hvc_sem);
     }
     break;
 
@@ -440,7 +447,7 @@ void BLEConnection::_eventHandler(ble_evt_t* evt)
       if (BLE_GATT_TIMEOUT_SRC_PROTOCOL == timeout_src)
       {
         _hvc_received = false;
-        if ( _hvc_sem ) xSemaphoreGive(_hvc_sem);
+        xSemaphoreGive(_hvc_sem);
       }
     }
     break;

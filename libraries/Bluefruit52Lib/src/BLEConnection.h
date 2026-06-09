@@ -66,9 +66,9 @@ class BLEConnection
 
     SemaphoreHandle_t _hvn_sem;
     SemaphoreHandle_t _wrcmd_sem;
-
-    // On-demand semaphore/data that are created on the fly
     SemaphoreHandle_t _hvc_sem;
+
+    TickType_t _indicate_confirm_timeout;
 
   public:
     BLEConnection(uint16_t conn_hdl, ble_gap_evt_connected_t const * evt_connected, uint8_t hvn_qsize, uint8_t wrcmd_qsize);
@@ -95,6 +95,7 @@ class BLEConnection
     bool disconnect(void);
 
     bool setTxPower(int8_t power); // set power for this connection
+    void setIndicateConfirmTimeout(uint32_t timeout_ms);
 
     bool requestDataLengthUpdate(ble_gap_data_length_params_t const *p_dl_params = NULL, ble_gap_data_length_limitation_t *p_dl_limitation = NULL);
     bool requestMtuExchange(uint16_t mtu);
@@ -109,6 +110,7 @@ class BLEConnection
     bool getHvnPacket(void);
     bool releaseHvnPacket(void);
     bool getWriteCmdPacket(void);
+    bool prepareForIndicateConfirm(void);
     bool waitForIndicateConfirm(void);
 
     bool saveBondKey(bond_keys_t const* ltkey);

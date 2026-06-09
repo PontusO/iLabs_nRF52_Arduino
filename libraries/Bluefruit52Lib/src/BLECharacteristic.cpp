@@ -874,7 +874,9 @@ bool BLECharacteristic::indicate(uint16_t conn_hdl, const void* data, uint16_t l
 
       LOG_LV2("CHR", "Indicate %d bytes", packet_len);
 
-      // Blocking wait until receiving confirmation from peer
+      // Blocking wait until receiving confirmation from peer.
+      // Reset HVC state BEFORE hvx() so a fast HVC event isn't drained as stale.
+      VERIFY ( conn->prepareForIndicateConfirm() );
       VERIFY_STATUS( sd_ble_gatts_hvx(conn_hdl, &hvx_params), false );
       VERIFY ( conn->waitForIndicateConfirm() );
 

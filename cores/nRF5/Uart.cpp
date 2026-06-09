@@ -90,42 +90,34 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
 
   uint32_t nrfBaudRate;
 
-  if (baudrate <= 1200) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud1200;
-  } else if (baudrate <= 2400) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud2400;
-  } else if (baudrate <= 4800) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud4800;
-  } else if (baudrate <= 9600) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud9600;
-  } else if (baudrate <= 14400) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud14400;
-  } else if (baudrate <= 19200) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud19200;
-  } else if (baudrate <= 28800) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud28800;
-  } else if (baudrate <= 31250) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud31250;
-  } else if (baudrate <= 38400) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud38400;
-  } else if (baudrate <= 56000) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud56000;
-  } else if (baudrate <= 57600) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud57600;
-  } else if (baudrate <= 76800) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud76800;
-  } else if (baudrate <= 115200) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud115200;
-  } else if (baudrate <= 230400) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud230400;
-  } else if (baudrate <= 250000) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud250000;
-  } else if (baudrate <= 460800) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud460800;
-  } else if (baudrate <= 921600) {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud921600;
-  } else {
-    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud1M;
+  // Use Nordic's pre-computed values for standard baudrates to match other
+  // nRF devices exactly; fall back to runtime computation for custom values.
+  switch (baudrate) {
+    case 1200:    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud1200;   break;
+    case 2400:    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud2400;   break;
+    case 4800:    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud4800;   break;
+    case 9600:    nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud9600;   break;
+    case 14400:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud14400;  break;
+    case 19200:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud19200;  break;
+    case 28800:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud28800;  break;
+    case 31250:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud31250;  break;
+    case 38400:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud38400;  break;
+    case 56000:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud56000;  break;
+    case 57600:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud57600;  break;
+    case 76800:   nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud76800;  break;
+    case 115200:  nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud115200; break;
+    case 230400:  nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud230400; break;
+    case 250000:  nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud250000; break;
+    case 460800:  nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud460800; break;
+    case 921600:  nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud921600; break;
+    case 1000000: nrfBaudRate = UARTE_BAUDRATE_BAUDRATE_Baud1M;     break;
+    default: {
+      // BAUDRATE = round(baudrate * 2^32 / 16e6) and round to nearest 0x1000.
+      // https://devzone.nordicsemi.com/f/nordic-q-a/391/uart-baudrate-register-values
+      const uint32_t regValue = (uint32_t)(((uint64_t)baudrate * 268435456ULL + 500000ULL) / 1000000ULL);
+      nrfBaudRate = (regValue + 0x800) & 0xFFFFF000;
+      break;
+    }
   }
 
   nrfUart->BAUDRATE = nrfBaudRate;

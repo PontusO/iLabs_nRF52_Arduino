@@ -239,6 +239,34 @@ bool Adafruit_LittleFS::rmdir_r (char const *filepath)
   return LFS_ERR_OK == err;
 }
 
+static int _lfs_count(void *p, lfs_block_t block) {
+  (void) block;
+  *(size_t *)p += 1;
+  return 0;
+}
+
+size_t Adafruit_LittleFS::usedBlocks() {
+  _lockFS();
+
+  size_t block_used = 0;
+  lfs_traverse(&_lfs, _lfs_count, &block_used);
+
+  _unlockFS();
+  return block_used;
+}
+
+size_t Adafruit_LittleFS::usedBytes() {
+  if (nullptr == _lfs_cfg)
+    return 0;
+  return _lfs_cfg->block_size * usedBlocks();
+}
+
+size_t Adafruit_LittleFS::totalBytes() {
+  if (nullptr == _lfs_cfg)
+    return 0;
+  return _lfs_cfg->block_size * _lfs_cfg->block_count;
+}
+
 //------------- Debug -------------//
 #if CFG_DEBUG
 

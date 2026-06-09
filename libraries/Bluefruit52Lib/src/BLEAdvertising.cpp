@@ -40,14 +40,51 @@
 /* BLEAdvertisingData shared between ADV and ScanResponse
  *------------------------------------------------------------------*/
 BLEAdvertisingData::BLEAdvertisingData(void)
+  : _data(NULL), _max_len(0), _count(0)
 {
-  _count = 0;
-  arrclr(_data);
+  setMaxLen(BLE_GAP_ADV_SET_DATA_SIZE_MAX);
+}
+
+BLEAdvertisingData::~BLEAdvertisingData(void)
+{
+  if (_data) rtos_free(_data);
+}
+
+void BLEAdvertisingData::setMaxLen(uint8_t max_len)
+{
+  if (_data && max_len == _max_len) return;
+
+  uint8_t* old_data  = _data;
+  uint8_t  old_count = _count;
+
+  if (old_count)
+  {
+    // stop advertising before re-allocate adv buffer
+    if (Bluefruit.Advertising.isRunning()) Bluefruit.Advertising.stop();
+  }
+
+  _data = (uint8_t*) rtos_malloc(max_len);
+  if (_data)
+  {
+    // Preserve previously added bytes across resize; truncate if shrinking.
+    uint8_t keep = (old_count <= max_len) ? old_count : max_len;
+    if (old_data && keep) memcpy(_data, old_data, keep);
+    if (keep < max_len)   memset(_data + keep, 0, max_len - keep);
+    _max_len = max_len;
+    _count   = keep;
+  }
+  else
+  {
+    _max_len = 0;
+    _count   = 0;
+  }
+
+  if (old_data) rtos_free(old_data);
 }
 
 bool BLEAdvertisingData::addData(uint8_t type, const void* data, uint8_t len)
 {
-  VERIFY( _count + len + 2 <= BLE_GAP_ADV_SET_DATA_SIZE_MAX );
+  VERIFY( _count + len + 2 <= _max_len );
 
   uint8_t* adv_data = &_data[_count];
 
@@ -177,19 +214,34 @@ bool BLEAdvertisingData::addService(BLEClientService& service)
  */
 bool BLEAdvertisingData::addName(void)
 {
-  char name[BLE_GAP_ADV_SET_DATA_SIZE_MAX+1];
+  // Need room for at least [len][type][1 char]
+  VERIFY(_count + 2 < _max_len);
+  uint8_t* adv_slot = &_data[_count];
+  const uint8_t remaining = _max_len - _count - 2;
 
-  uint8_t type = BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME;
-  uint8_t len  = Bluefruit.getName(name, sizeof(name));
+  // Try writing the name directly into _data. If it fits, sd returns NRF_SUCCESS
+  // with name_len = bytes copied. If it doesn't fit, sd returns NRF_ERROR_DATA_SIZE
+  // without copying and sets name_len to the full device name length.
+  uint16_t name_len = remaining;
+  uint32_t err = sd_ble_gap_device_name_get(adv_slot + 2, &name_len);
 
-  // not enough for full name, chop it
-  if (_count + len + 2 > BLE_GAP_ADV_SET_DATA_SIZE_MAX)
-  {
+  uint8_t type;
+  uint8_t len;
+  if (err == NRF_SUCCESS) {
+    type = BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME;
+    len  = (uint8_t) name_len;
+  } else {
+    // Truncate: fetch full name into a temp buffer, then copy what fits.
+    uint8_t buftmp[name_len];
+    VERIFY_STATUS(sd_ble_gap_device_name_get(buftmp, &name_len), false);
+    memcpy(adv_slot + 2, buftmp, remaining);
     type = BLE_GAP_AD_TYPE_SHORT_LOCAL_NAME;
-    len  = BLE_GAP_ADV_SET_DATA_SIZE_MAX - (_count+2);
+    len  = remaining;
   }
 
-  VERIFY( addData(type, name, len) );
+  adv_slot[0] = len + 1;
+  adv_slot[1] = type;
+  _count += 2 + len;
 
   return type == BLE_GAP_AD_TYPE_COMPLETE_LOCAL_NAME;
 }
@@ -231,7 +283,7 @@ uint8_t* BLEAdvertisingData::getData(void)
 
 bool BLEAdvertisingData::setData(uint8_t const * data, uint8_t count)
 {
-  VERIFY( data && (count <= BLE_GAP_ADV_SET_DATA_SIZE_MAX) );
+  VERIFY( data && (count <= _max_len) );
 
   memcpy(_data, data, count);
   _count = count;
@@ -242,7 +294,7 @@ bool BLEAdvertisingData::setData(uint8_t const * data, uint8_t count)
 void BLEAdvertisingData::clearData(void)
 {
   _count = 0;
-  arrclr(_data);
+  if (_data) memset(_data, 0, _max_len);
 }
 
 /*------------------------------------------------------------------*/
@@ -275,6 +327,16 @@ void BLEAdvertising::setFastTimeout(uint16_t sec)
 void BLEAdvertising::setType(uint8_t adv_type)
 {
   _type = adv_type;
+  if (isExtended())
+  {
+    // Connectable extended PDUs are capped at 238 bytes; other extended PDUs at 255.
+    setMaxLen(isConnectable() ? BLE_GAP_ADV_SET_DATA_SIZE_EXTENDED_CONNECTABLE_MAX_SUPPORTED
+                              : BLE_GAP_ADV_SET_DATA_SIZE_EXTENDED_MAX_SUPPORTED);
+  }
+  else
+  {
+    setMaxLen(BLE_GAP_ADV_SET_DATA_SIZE_MAX);
+  }
 }
 
 /**
@@ -294,6 +356,22 @@ void BLEAdvertising::setInterval(uint16_t fast, uint16_t slow)
 void BLEAdvertising::setIntervalMS(uint16_t fast, uint16_t slow)
 {
   setInterval(MS1000TO625(fast), MS1000TO625(slow));
+}
+
+void BLEAdvertising::setMaxEvents(uint8_t maxEvents)
+{
+  _max_events = maxEvents;
+}
+
+void BLEAdvertising::setFilter(uint8_t filter)
+{
+  _filter = filter;
+}
+
+void BLEAdvertising::setPhy(uint8_t phy)
+{
+  _primary_phy = phy;
+  _secondary_phy = phy;
 }
 
 /**
@@ -324,6 +402,42 @@ bool BLEAdvertising::isRunning(void)
   return _running;
 }
 
+bool BLEAdvertising::isScannable(void)
+{
+ return _type == BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED
+     || _type == BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED
+     || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_UNDIRECTED
+     || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_DIRECTED;
+}
+
+bool BLEAdvertising::isConnectable(void)
+{
+  return _type == BLE_GAP_ADV_TYPE_CONNECTABLE_SCANNABLE_UNDIRECTED
+      || _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED_HIGH_DUTY_CYCLE
+      || _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_UNDIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_DIRECTED;
+}
+
+bool BLEAdvertising::isDirected(void)
+{
+  return _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED_HIGH_DUTY_CYCLE
+      || _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_NONSCANNABLE_DIRECTED;
+}
+
+bool BLEAdvertising::isExtended(void)
+{
+  return _type == BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_UNDIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_UNDIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_DIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED
+      || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_NONSCANNABLE_DIRECTED;
+}
+
 bool BLEAdvertising::setBeacon(BLEBeacon& beacon)
 {
   return beacon.start(*this);
@@ -347,25 +461,17 @@ bool BLEAdvertising::_start(uint16_t interval, uint16_t timeout) {
     .interval      = interval                 , // advertising interval (in units of 0.625 ms)
     .duration      = (uint16_t) (timeout*100) , // in 10-ms unit
 
-    .max_adv_evts  = 0                        , // TODO can be used for fast/slow mode
-    .channel_mask  = { 0, 0, 0, 0, 0 }        , // 40 channel, set 1 to disable
-    .filter_policy = BLE_GAP_ADV_FP_ANY       ,
+    .max_adv_evts  = _max_events              , // can be used for fast/slow mode
+    .channel_mask  = { 0, 0, 0, 0, 0 }        , // 40 channel, set 1 to disable, e.g. { 0, 0, 0, 0, 0xA0 } for not primary 37 and 38
+    .filter_policy = _filter                  ,
 
-    .primary_phy   = BLE_GAP_PHY_AUTO         , // 1 Mbps will be used
-    .secondary_phy = BLE_GAP_PHY_AUTO         , // 1 Mbps will be used
+    .primary_phy   = (isExtended() ? _primary_phy : (uint8_t)BLE_GAP_PHY_AUTO) ,
+    .secondary_phy = _secondary_phy           ,
       // , .set_id, .scan_req_notification
   };
 
-  switch(_type) {
-    case BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED_HIGH_DUTY_CYCLE:
-    case BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED:
-    case BLE_GAP_ADV_TYPE_EXTENDED_CONNECTABLE_NONSCANNABLE_DIRECTED:
-    case BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_DIRECTED:
-    case BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_NONSCANNABLE_DIRECTED:
-      adv_para.p_peer_addr = &_peer_addr;
-      break;
-
-    default: break;
+  if (isDirected()) {
+    adv_para.p_peer_addr = &_peer_addr;
   }
 
   // stop first if current running since we may change advertising data/params
@@ -375,10 +481,34 @@ bool BLEAdvertising::_start(uint16_t interval, uint16_t timeout) {
 
   // gap_adv long-live is required by SD v6
   static ble_gap_adv_data_t gap_adv;
-  gap_adv.adv_data.p_data = _data;
-  gap_adv.adv_data.len = _count;
-  gap_adv.scan_rsp_data.p_data = Bluefruit.ScanResponse.getData();
-  gap_adv.scan_rsp_data.len = Bluefruit.ScanResponse.count();
+
+  // no advertising data supported?
+  // https://infocenter.nordicsemi.com/topic/com.nordic.infocenter.s140.api.v7.3.0/group___b_l_e___g_a_p___a_d_v___t_y_p_e_s.html
+  if ( _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED
+    || _type == BLE_GAP_ADV_TYPE_CONNECTABLE_NONSCANNABLE_DIRECTED_HIGH_DUTY_CYCLE
+    || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_UNDIRECTED
+    || _type == BLE_GAP_ADV_TYPE_EXTENDED_NONCONNECTABLE_SCANNABLE_DIRECTED )
+  {
+    gap_adv.adv_data.p_data = nullptr;
+    gap_adv.adv_data.len = 0;
+  }
+  else
+  {
+    gap_adv.adv_data.p_data = _data;
+    gap_adv.adv_data.len = _count;
+  }
+
+  // no scan response data required?
+  if (!isScannable())
+  {
+    gap_adv.scan_rsp_data.p_data = nullptr;
+    gap_adv.scan_rsp_data.len = 0;
+  }
+  else
+  {
+    gap_adv.scan_rsp_data.p_data = Bluefruit.ScanResponse.getData();
+    gap_adv.scan_rsp_data.len = Bluefruit.ScanResponse.count();
+  }
 
   VERIFY_STATUS( sd_ble_gap_adv_set_configure(&_hdl, &gap_adv, &adv_para), false );
   VERIFY_STATUS( sd_ble_gap_tx_power_set(BLE_GAP_TX_POWER_ROLE_ADV, _hdl, Bluefruit.getTxPower() ), false );
@@ -478,6 +608,18 @@ void BLEAdvertising::_eventHandler(ble_evt_t* evt)
             // invoke stop callback
             if (_stop_cb) ada_callback(NULL, 0, _stop_cb);
           }
+        }
+      }else
+      {
+        if (evt->evt.gap_evt.params.adv_set_terminated.reason == BLE_GAP_EVT_ADV_SET_TERMINATED_REASON_LIMIT_REACHED)
+        {
+          _running = false;
+
+          // Stop advertising
+          Bluefruit._stopConnLed(); // stop blinking
+
+          // invoke stop callback
+          if (_stop_cb) ada_callback(NULL, 0, _stop_cb);
         }
       }
     break;
