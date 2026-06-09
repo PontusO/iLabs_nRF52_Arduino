@@ -25,7 +25,7 @@ mcu_dict = {
 }
 
 
-def build_upload(mcu, name):
+def build_upload(mcu, name, cfg):
     print("# Upload")
     print(f"{name}.bootloader.tool=bootburn")
     print(f"{name}.upload.tool=nrfutil")
@@ -37,12 +37,12 @@ def build_upload(mcu, name):
     else:
         print(f"{name}.upload.use_1200bps_touch=true")
         print(f"{name}.upload.wait_for_upload_port=true")
-    print(f"{name}.upload.maximum_size={mcu_dict[mcu]['flash_size']}")
-    print(f"{name}.upload.maximum_data_size={mcu_dict[mcu]['data_size']}")
+    print(f"{name}.upload.maximum_size={cfg['flash_size']}")
+    print(f"{name}.upload.maximum_data_size={cfg['data_size']}")
     print()
 
 
-def build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list):
+def build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list, cfg):
     prettyname = vendor_name + " " + product_name
     print()
     print("# -----------------------------------")
@@ -57,7 +57,7 @@ def build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid
         print(f"{name}.pid.{i}={pid_list[i]}")
     print()
 
-    build_upload(mcu, name)
+    build_upload(mcu, name, cfg)
 
     print("# Build")
     print(f"{name}.build.mcu=cortex-m4")
@@ -68,14 +68,13 @@ def build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid
     print(f'{name}.build.usb_manufacturer="{vendor_name}"')
     print(f'{name}.build.usb_product="{product_name}"')
 
-    mcu_info = mcu_dict[mcu]
-    print(f"{name}.build.extra_flags={mcu_info['extra_flags']}")
-    print(f"{name}.build.ldscript={mcu_info['ldscript']}")
+    print(f"{name}.build.extra_flags={cfg['extra_flags']}")
+    print(f"{name}.build.ldscript={cfg['ldscript']}")
     print(f"{name}.build.openocdscript=scripts/openocd/daplink_nrf52.cfg")
     if mcu != 52832:
         print(f"{name}.build.vid={vid}")
         print(f"{name}.build.pid={pid_list[0]}")
-        print(f"{name}.build.uf2_family={mcu_info['uf2_family']}")
+        print(f"{name}.build.uf2_family={cfg['uf2_family']}")
     print()
 
 
@@ -138,8 +137,15 @@ def build_global_menu():
     print("menu.debug_output=Debug Output")
     print("menu.external_mem_size=External FLASH Memory")
 
-def make_board(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
-    build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list)
+def make_board(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None, overrides=None):
+    # Effective per-board config = MCU defaults + optional per-board overrides.
+    # Use `overrides` to set a different linker script, flash ceiling, etc. for
+    # boards whose layout diverges from the MCU default (e.g. iLabs boards that
+    # ship the QSPI-variant bootloader at 0xF0000 instead of 0xF4000).
+    cfg = dict(mcu_dict[mcu])
+    if overrides:
+        cfg.update(overrides)
+    build_header(mcu, name, variant, vendor_name, product_name, boarddefine, vid, pid_list, cfg)
     build_softdevice(mcu, name)
     build_debug(name)
     build_debug_output(name)
@@ -202,6 +208,17 @@ print("# -------------------------------------------------------")
 print("# Boards that aren't made by Adafruit")
 print("# and are not officially supported")
 print("# -------------------------------------------------------")
+# iLabs boards ship the QSPI-variant Adafruit nRF52 bootloader at 0xF0000
+# (shifted 16 KB down from the stock 0xF4000 to make room for the QSPI
+# backup/rollback feature). App code therefore ends at 0xE6000 and LFS
+# owns 0xE6000-0xF0000 (see InternalFileSystem.cpp). Override the MCU
+# defaults accordingly. The bootloader has matching _Static_asserts that
+# fail the build if BOOTLOADER_REGION_START / DFU_APP_DATA_RESERVED drift.
+ilabs_qspi_bl_overrides = {
+    'flash_size': 786432,                       # 0xE6000 - 0x26000
+    'ldscript':   'nrf52840_s140_v6_qspi_bl.ld',
+}
+
 #make_board(name, variant, vendor_name, product_name, boarddefine, vid, pid_list, ext_mem=None):
 thirdparty_boards_list = [
     [52840, "pca10056", "pca10056", "Nordic", "nRF52840 DK", "NRF52840_PCA10056",
@@ -211,13 +228,12 @@ thirdparty_boards_list = [
      "0x239A", ["0x8029", "0x0029"]],
 
     [52840, "challenger_840_ble", "challenger_840_ble", "iLabs", "Challenger 840 BLE", "CHALLENGER_840_BLE",
-           "0x1209", ["0x7380", "0x7381"], [["0MB", "None"], ["2MB", "W25Q16FW"], ["4MB", "W25Q32FV"], ["8MB", "W25Q64JV_IM"]]],
+           "0x1209", ["0x7380", "0x7381"], [["0MB", "None"], ["2MB", "W25Q16FW"], ["4MB", "W25Q32FV"], ["8MB", "W25Q64JV_IM"]],
+           ilabs_qspi_bl_overrides],
 
     [52840, "connectivity_840", "connectivity_840", "iLabs", "Connectivity 840", "CONNECTIVITY_840",
-           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]]],
-
-    [52840, "mithings-modem", "mithings-modem", "iLabs", "MiThings modem board", "MITHINGS_MODEM",
-           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]]],
+           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]],
+           ilabs_qspi_bl_overrides],
 ]
 
 for b in thirdparty_boards_list:

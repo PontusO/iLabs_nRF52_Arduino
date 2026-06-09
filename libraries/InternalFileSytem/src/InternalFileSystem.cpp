@@ -25,13 +25,25 @@
 #include "InternalFileSystem.h"
 #include "flash/flash_nrf5x.h"
 
-#ifdef NRF52840_XXAA
+#if defined(ARDUINO_CONNECTIVITY_840) || defined(ARDUINO_CHALLENGER_840_BLE)
+  // Boards using the iLabs/QSPI-variant Adafruit nRF52 bootloader at
+  // 0x000F0000 (shifted 16 KB down from 0x000F4000 to fit the QSPI backup
+  // driver). LFS spans the full 40 KB app-data region the bootloader
+  // reserves -- the partition end MUST equal the bootloader region start,
+  // or the first LFS write erases the bootloader's reset vector and the
+  // unit is unrecoverable without SWD.
+  #define LFS_FLASH_ADDR        0xE6000
+  #define LFS_FLASH_TOTAL_SIZE  (10*FLASH_NRF52_PAGE_SIZE)
+  static_assert((LFS_FLASH_ADDR + LFS_FLASH_TOTAL_SIZE) == 0xF0000,
+                "LFS partition end must equal QSPI-variant bootloader region start (0xF0000)");
+#elif defined(NRF52840_XXAA)
   #define LFS_FLASH_ADDR        0xED000
+  #define LFS_FLASH_TOTAL_SIZE  (7*FLASH_NRF52_PAGE_SIZE)
 #else
   #define LFS_FLASH_ADDR        0x6D000
+  #define LFS_FLASH_TOTAL_SIZE  (7*FLASH_NRF52_PAGE_SIZE)
 #endif
 
-#define LFS_FLASH_TOTAL_SIZE  (7*FLASH_NRF52_PAGE_SIZE)
 #define LFS_BLOCK_SIZE        128
 
 //--------------------------------------------------------------------+

@@ -150,7 +150,7 @@ challenger_840_ble.upload.tool=nrfutil
 challenger_840_ble.upload.protocol=nrfutil
 challenger_840_ble.upload.use_1200bps_touch=true
 challenger_840_ble.upload.wait_for_upload_port=true
-challenger_840_ble.upload.maximum_size=815104
+challenger_840_ble.upload.maximum_size=786432
 challenger_840_ble.upload.maximum_data_size=237568
 
 # Build
@@ -162,7 +162,7 @@ challenger_840_ble.build.variant=challenger_840_ble
 challenger_840_ble.build.usb_manufacturer="iLabs"
 challenger_840_ble.build.usb_product="Challenger 840 BLE"
 challenger_840_ble.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
-challenger_840_ble.build.ldscript=nrf52840_s140_v6.ld
+challenger_840_ble.build.ldscript=nrf52840_s140_v6_qspi_bl.ld
 challenger_840_ble.build.openocdscript=scripts/openocd/daplink_nrf52.cfg
 challenger_840_ble.build.vid=0x1209
 challenger_840_ble.build.pid=0x7380
@@ -220,7 +220,7 @@ connectivity_840.upload.tool=nrfutil
 connectivity_840.upload.protocol=nrfutil
 connectivity_840.upload.use_1200bps_touch=true
 connectivity_840.upload.wait_for_upload_port=true
-connectivity_840.upload.maximum_size=815104
+connectivity_840.upload.maximum_size=786432
 connectivity_840.upload.maximum_data_size=237568
 
 # Build
@@ -232,7 +232,7 @@ connectivity_840.build.variant=connectivity_840
 connectivity_840.build.usb_manufacturer="iLabs"
 connectivity_840.build.usb_product="Connectivity 840"
 connectivity_840.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
-connectivity_840.build.ldscript=nrf52840_s140_v6.ld
+connectivity_840.build.ldscript=nrf52840_s140_v6_qspi_bl.ld
 connectivity_840.build.openocdscript=scripts/openocd/daplink_nrf52.cfg
 connectivity_840.build.vid=0x1209
 connectivity_840.build.pid=0x7384
@@ -268,69 +268,3 @@ connectivity_840.menu.external_mem_size.0MB=0MB (None)
 connectivity_840.menu.external_mem_size.0MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=None
 connectivity_840.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
 connectivity_840.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM
-
-# -----------------------------------
-# iLabs MiThings modem board
-# -----------------------------------
-mithings-modem.name=iLabs MiThings modem board
-
-# VID/PID for Bootloader, Arduino & CircuitPython
-mithings-modem.vid.0=0x1209
-mithings-modem.pid.0=0x7384
-mithings-modem.vid.1=0x1209
-mithings-modem.pid.1=0x7385
-
-# Upload
-mithings-modem.bootloader.tool=bootburn
-mithings-modem.upload.tool=nrfutil
-mithings-modem.upload.protocol=nrfutil
-mithings-modem.upload.use_1200bps_touch=true
-mithings-modem.upload.wait_for_upload_port=true
-mithings-modem.upload.maximum_size=815104
-mithings-modem.upload.maximum_data_size=237568
-
-# Build
-mithings-modem.build.mcu=cortex-m4
-mithings-modem.build.f_cpu=64000000
-mithings-modem.build.board=MITHINGS_MODEM
-mithings-modem.build.core=nRF5
-mithings-modem.build.variant=mithings-modem
-mithings-modem.build.usb_manufacturer="iLabs"
-mithings-modem.build.usb_product="MiThings modem board"
-mithings-modem.build.extra_flags=-DNRF52840_XXAA {build.flags.usb}
-mithings-modem.build.ldscript=nrf52840_s140_v6.ld
-mithings-modem.build.openocdscript=scripts/openocd/daplink_nrf52.cfg
-mithings-modem.build.vid=0x1209
-mithings-modem.build.pid=0x7384
-mithings-modem.build.uf2_family=0xADA52840
-
-# Menu: SoftDevice
-mithings-modem.menu.softdevice.s140v6=S140 6.1.1
-mithings-modem.menu.softdevice.s140v6.build.sd_name=s140
-mithings-modem.menu.softdevice.s140v6.build.sd_version=6.1.1
-mithings-modem.menu.softdevice.s140v6.build.sd_fwid=0x00B6
-
-# Menu: Debug Level
-mithings-modem.menu.debug.l0=Level 0 (Release)
-mithings-modem.menu.debug.l0.build.debug_flags=-DCFG_DEBUG=0
-mithings-modem.menu.debug.l1=Level 1 (Error Message)
-mithings-modem.menu.debug.l1.build.debug_flags=-DCFG_DEBUG=1
-mithings-modem.menu.debug.l2=Level 2 (Full Debug)
-mithings-modem.menu.debug.l2.build.debug_flags=-DCFG_DEBUG=2
-mithings-modem.menu.debug.l3=Level 3 (Segger SystemView)
-mithings-modem.menu.debug.l3.build.debug_flags=-DCFG_DEBUG=3
-mithings-modem.menu.debug.l3.build.sysview_flags=-DCFG_SYSVIEW=1
-
-# Menu: Debug Port
-mithings-modem.menu.debug_output.serial=Serial
-mithings-modem.menu.debug_output.serial.build.logger_flags=-DCFG_LOGGER=0
-mithings-modem.menu.debug_output.serial1=Serial1
-mithings-modem.menu.debug_output.serial1.build.logger_flags=-DCFG_LOGGER=1 -DCFG_TUSB_DEBUG=CFG_DEBUG
-mithings-modem.menu.debug_output.rtt=Segger RTT
-mithings-modem.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_TUSB_DEBUG=CFG_DEBUG -DSEGGER_RTT_MODE_DEFAULT=SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
-
-# External memory size
-mithings-modem.menu.external_mem_size.0MB=0MB (None)
-mithings-modem.menu.external_mem_size.0MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=None
-mithings-modem.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
-mithings-modem.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM
