@@ -167,20 +167,6 @@ rollback() {
         mv "${INDEX_FILE}.bak" "${INDEX_FILE}" && echo "  - reverted ${INDEX_FILE}" >&2
     fi
     case "$STAGE" in
-        bumped)
-            git checkout -- platform.txt && echo "  - reverted platform.txt bump" >&2
-            rm -f platform.txt.bak
-            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
-            ;;
-        committed)
-            git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
-            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
-            ;;
-        tagged)
-            git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
-            git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
-            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
-            ;;
         tagged_only)
             git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
             rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
@@ -201,28 +187,14 @@ trap rollback EXIT
 echo "Initialising submodules..."
 git submodule update --init --recursive
 
-# ---------- version bump + tag ----------
+# ---------- tag ----------
+# Both platform.txt and package.json carry an AUTO_VERSION placeholder at
+# HEAD that's substituted into the staged tarball only — so there's no
+# in-tree bump to commit. Just tag HEAD as the release.
 if [[ "$NO_TAG" -eq 0 ]]; then
-    CURRENT_VERSION=$(sed -n 's/^version=//p' platform.txt)
-    if [[ "$CURRENT_VERSION" == "$VERSION" ]]; then
-        echo "platform.txt already at version=${VERSION}; tagging HEAD without a bump commit."
-        git tag -a "${TAG}" -m "Release v${VERSION}"
-        STAGE=tagged_only
-        echo "Created tag ${TAG}"
-    else
-        echo "Bumping platform.txt from ${CURRENT_VERSION} to ${VERSION}"
-        sed -i.bak "s/^version=.*/version=${VERSION}/" platform.txt
-        rm -f platform.txt.bak
-        STAGE=bumped
-
-        git add platform.txt
-        git commit -m "Release v${VERSION}"
-        STAGE=committed
-
-        git tag -a "${TAG}" -m "Release v${VERSION}"
-        STAGE=tagged
-        echo "Created commit + tag ${TAG}"
-    fi
+    git tag -a "${TAG}" -m "Release v${VERSION}"
+    STAGE=tagged_only
+    echo "Created tag ${TAG}"
 fi
 
 # ---------- stage ----------
@@ -247,10 +219,16 @@ find "${OUT_DIR}/${VER_NAME}" \
        -o -name .gitattributes -o -name .editorconfig \) \
     -prune -exec rm -rf {} +
 
-# --no-tag path: in-tree platform.txt wasn't bumped, so patch the staged copy.
-if [[ "$NO_TAG" -eq 1 ]]; then
-    sed -i.bak "s/^version=.*/version=${VERSION}/" "${OUT_DIR}/${VER_NAME}/platform.txt"
-    rm -f "${OUT_DIR}/${VER_NAME}/platform.txt.bak"
+# Substitute AUTO_VERSION placeholders in the staged tarball. Both platform.txt
+# and package.json keep the literal placeholder at HEAD so anyone reading the
+# repo sees it's auto-populated; the actual version only lands in the tarball.
+sed -i.bak "s/^version=AUTO_VERSION/version=${VERSION}/" \
+    "${OUT_DIR}/${VER_NAME}/platform.txt"
+rm -f "${OUT_DIR}/${VER_NAME}/platform.txt.bak"
+if [[ -f "${OUT_DIR}/${VER_NAME}/package.json" ]]; then
+    sed -i.bak "s/\"AUTO_VERSION\"/\"${VERSION}\"/" \
+        "${OUT_DIR}/${VER_NAME}/package.json"
+    rm -f "${OUT_DIR}/${VER_NAME}/package.json.bak"
 fi
 
 # ---------- pack ----------

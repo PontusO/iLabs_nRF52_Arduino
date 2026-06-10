@@ -17,8 +17,10 @@
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 name=Adafruit/iLabs nRF52 Boards
-# Don't change manually, this is filled in by the packaging script.
-version=1.7.101
+# Placeholder — tools/package substitutes this in the staged tarball at release
+# time. The repo HEAD always reads AUTO_VERSION so people can tell at a glance
+# they're on a dev clone (vs. a released BSP installed via Board Manager).
+version=AUTO_VERSION
 
 # Compile variables
 # -----------------

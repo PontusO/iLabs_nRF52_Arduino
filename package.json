@@ -1,0 +1,15 @@
+{
+    "name": "framework-arduinoadafruitnrf52",
+    "description": "Arduino Wiring-based Framework for Nordic Semiconductor nRF52 BLE SoC — iLabs fork of the Adafruit Bluefruit lineup.",
+    "keywords": [
+        "framework",
+        "arduino",
+        "nordic semiconductor",
+        "nrf52",
+        "nrf52840",
+        "ilabs"
+    ],
+    "system": "all",
+    "url": "https://github.com/PontusO/iLabs_nRF52_Arduino",
+    "version": "AUTO_VERSION"
+}
