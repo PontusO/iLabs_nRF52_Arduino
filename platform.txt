@@ -18,7 +18,7 @@
 
 name=Adafruit/iLabs nRF52 Boards
 # Bumped by tools/package on each release; reflects the last release cut from master.
-version=1.7.101
+version=1.7.102
 
 # Compile variables
 # -----------------
