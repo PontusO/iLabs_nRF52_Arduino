@@ -127,12 +127,14 @@ if [[ "$DO_RELEASE" -eq 1 ]]; then
     # Detect whether a default repo is configured for this working directory.
     # Without one, `gh release create` fails with "No default remote repository
     # has been set" partway through the release flow.
-    if ! gh repo set-default --view >/dev/null 2>&1; then
+    #
+    # NB: `gh repo set-default --view` exits 0 even when no default is set —
+    # it just prints nothing. Check the OUTPUT, not the exit code.
+    if [[ -z "$(gh repo set-default --view 2>/dev/null)" ]]; then
         echo "No default GitHub repo is configured for this directory."
         echo "Launching 'gh repo set-default' — pick the iLabs fork from the list."
         gh repo set-default
-        # Re-verify; if the user aborted the picker, bail out cleanly.
-        if ! gh repo set-default --view >/dev/null 2>&1; then
+        if [[ -z "$(gh repo set-default --view 2>/dev/null)" ]]; then
             echo "Error: still no default repo set; aborting." >&2
             exit 1
         fi
