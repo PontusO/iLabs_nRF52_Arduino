@@ -113,9 +113,30 @@ if [[ "$NO_TAG" -eq 0 ]]; then
     fi
 fi
 
-if [[ "$DO_RELEASE" -eq 1 ]] && ! command -v gh >/dev/null; then
-    echo "Error: --release requires the GitHub CLI (gh) to be installed and authenticated" >&2
-    exit 1
+if [[ "$DO_RELEASE" -eq 1 ]]; then
+    if ! command -v gh >/dev/null; then
+        echo "Error: --release requires the GitHub CLI (gh)." >&2
+        echo "       Install: https://cli.github.com/" >&2
+        exit 1
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+        echo "Error: gh is installed but not authenticated for this user." >&2
+        echo "       Run:  gh auth login" >&2
+        exit 1
+    fi
+    # Detect whether a default repo is configured for this working directory.
+    # Without one, `gh release create` fails with "No default remote repository
+    # has been set" partway through the release flow.
+    if ! gh repo set-default --view >/dev/null 2>&1; then
+        echo "No default GitHub repo is configured for this directory."
+        echo "Launching 'gh repo set-default' — pick the iLabs fork from the list."
+        gh repo set-default
+        # Re-verify; if the user aborted the picker, bail out cleanly.
+        if ! gh repo set-default --view >/dev/null 2>&1; then
+            echo "Error: still no default repo set; aborting." >&2
+            exit 1
+        fi
+    fi
 fi
 
 if [[ -n "$INDEX_FILE" ]]; then
