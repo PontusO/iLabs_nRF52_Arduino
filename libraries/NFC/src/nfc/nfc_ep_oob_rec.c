@@ -98,8 +98,10 @@ static ret_code_t nfc_ep_oob_bluetooth_device_address_encode(uint8_t  * const p_
         return NRF_ERROR_NO_MEM;
     }
 
-    /* Get BLE address */
-    err_code = sd_ble_gap_address_get(&device_address);
+    /* Get BLE address. SoftDevice S130/S132 v2 named this sd_ble_gap_address_get;
+     * S132 v3+ and S140 renamed it to sd_ble_gap_addr_get. Same signature, same
+     * semantics — just the modern spelling. */
+    err_code = sd_ble_gap_addr_get(&device_address);
     if (err_code != NRF_SUCCESS)
     {
         return err_code;

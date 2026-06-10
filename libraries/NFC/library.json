@@ -1,0 +1,6 @@
+{
+    "name": "NFC",
+    "build": {
+        "extraScript": "extra_script.py"
+    }
+}

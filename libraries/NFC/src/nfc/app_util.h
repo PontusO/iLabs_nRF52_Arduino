@@ -395,14 +395,18 @@ static __INLINE uint32_t uint32_big_decode(const uint8_t * p_encoded_data)
  */
 static __INLINE uint8_t uint32_big_encode(uint32_t value, uint8_t * p_encoded_data)
 {
-#ifdef NRF51
+    /* Upstream Nordic SDK gated this on bare `NRF52` (without defined()),
+     * which the current iLabs BSP doesn't define — it ships -DNRF52_SERIES
+     * and -DNRF52840_XXAA instead. With the old guard, neither branch
+     * matched and the function silently returned without writing the
+     * payload-length field, producing NDEF records with payload_length=0
+     * (phone reads only the UID, no NDEF content delivered). The
+     * byte-by-byte form is correct on every ARM target; the optimizer
+     * collapses it to a single REV instruction at -Ofast. */
     p_encoded_data[0] = (uint8_t) ((value & 0xFF000000) >> 24);
     p_encoded_data[1] = (uint8_t) ((value & 0x00FF0000) >> 16);
     p_encoded_data[2] = (uint8_t) ((value & 0x0000FF00) >> 8);
     p_encoded_data[3] = (uint8_t) ((value & 0x000000FF) >> 0);
-#elif NRF52
-    *(uint32_t *)p_encoded_data = __REV(value);
-#endif
     return sizeof(uint32_t);
 }
 

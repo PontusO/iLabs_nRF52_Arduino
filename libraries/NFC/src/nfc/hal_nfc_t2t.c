@@ -156,8 +156,8 @@ static inline void nrf_nfct_clock_event_handler(nrf_drv_clock_evt_type_t event);
 static inline void nrf_nfct_field_event_handler(volatile nfct_field_sense_state_t field_state);
 
 /* Static data */
-static hal_nfc_callback             m_nfc_lib_callback = (hal_nfc_callback) NULL;                 /**< Callback to nfc_lib layer */
-static void *                       m_nfc_lib_context;                                            /**< Callback execution context */
+static volatile hal_nfc_callback    m_nfc_lib_callback = (hal_nfc_callback) NULL;                 /**< Callback to nfc_lib layer (volatile: set in main context, read from NFCT_IRQHandler) */
+static void * volatile              m_nfc_lib_context;                                            /**< Callback execution context (volatile: same reason) */
 static volatile uint8_t             m_nfc_rx_buffer[NFC_RX_BUFFER_SIZE]   = {0};                  /**< Buffer for NFC Rx data */
 static volatile bool                m_slp_req_received                    = false;                /**< Flag indicating that SLP_REQ Command was received */
 #ifndef HAL_NFC_ENGINEERING_BC_FTPAN_WORKAROUND
