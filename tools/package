@@ -18,9 +18,29 @@
 #                    GitHub release with the tarball attached. Requires `gh`.
 #   --format gz|bz2  Archive compression. Default: gz (Adafruit/Arduino convention).
 #   --remote NAME    Git remote to push to with --release (default: origin).
+#   --index-file F   Path to package_ilabs-nrf52_index.json. Defaults to the
+#                    gh-pages worktree at
+#                    ~/build/iLabs_nRF52_Arduino-pages/package_ilabs-nrf52_index.json.
+#                    With --release, the script also commits + pushes the
+#                    change on whatever branch the worktree is on (gh-pages).
+#   --out-dir D      Where to stage and write the tarball. Default:
+#                    ~/build/ilabs-bsp. Don't put this inside an Arduino
+#                    hardware/<vendor>/ directory — Arduino will try to load
+#                    the unpacked staging tree as a BSP and fail.
 #
 
 set -euo pipefail
+
+# Base URL for the release tarball, used in the platforms[] entry of the
+# board-manager index. Historical convention here is bare ${VERSION} (no v
+# prefix), matching the existing entries.
+RELEASE_URL_BASE="https://github.com/PontusO/iLabs_nRF52_Arduino/releases/download"
+
+# Default location of the board-manager index file. This is a worktree of the
+# gh-pages branch of this same repo; --release commits and pushes the change
+# there so GitHub Pages re-serves the updated index. Override per-run with
+# --index-file <path> (e.g. for testing).
+INDEX_FILE_DEFAULT="${HOME}/build/iLabs_nRF52_Arduino-pages/package_ilabs-nrf52_index.json"
 
 # ---------- arg parsing ----------
 if [[ $# -lt 1 ]]; then
@@ -33,17 +53,24 @@ NO_TAG=0
 DO_RELEASE=0
 FORMAT=gz
 REMOTE=origin
+INDEX_FILE=""
+OUT_DIR_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --no-tag)  NO_TAG=1 ;;
-        --release) DO_RELEASE=1 ;;
-        --format)  FORMAT=${2:?--format needs a value}; shift ;;
-        --remote)  REMOTE=${2:?--remote needs a value}; shift ;;
+        --no-tag)     NO_TAG=1 ;;
+        --release)    DO_RELEASE=1 ;;
+        --format)     FORMAT=${2:?--format needs a value}; shift ;;
+        --remote)     REMOTE=${2:?--remote needs a value}; shift ;;
+        --index-file) INDEX_FILE=${2:?--index-file needs a path}; shift ;;
+        --out-dir)    OUT_DIR_OVERRIDE=${2:?--out-dir needs a path}; shift ;;
         *) echo "Unknown option: $1" >&2; exit 1 ;;
     esac
     shift
 done
+
+# Default index file: gh-pages worktree. Override with --index-file.
+INDEX_FILE=${INDEX_FILE:-$INDEX_FILE_DEFAULT}
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.-]+)?$ ]]; then
     echo "Error: version '$VERSION' is not semver (e.g. 1.7.101)" >&2
@@ -63,7 +90,10 @@ cd "$REPO_ROOT"
 VER_NAME="ilabs-nrf52-${VERSION}"
 ARCHIVE_NAME="${VER_NAME}.${EXT}"
 TAG="v${VERSION}"
-OUT_DIR="${REPO_ROOT}/../package"
+# Default OUT_DIR is OUTSIDE any Arduino hardware/<vendor>/ directory, because
+# Arduino scans hardware/<vendor>/* and tries to load each subdirectory as a
+# BSP — including a staging tree like hardware/ilabs/package/ilabs-nrf52-X.Y.Z/.
+OUT_DIR="${OUT_DIR_OVERRIDE:-${HOME}/build/ilabs-bsp}"
 
 # ---------- preflight ----------
 if [[ ! -f boards.txt || ! -f platform.txt ]]; then
@@ -88,6 +118,17 @@ if [[ "$DO_RELEASE" -eq 1 ]] && ! command -v gh >/dev/null; then
     exit 1
 fi
 
+if [[ -n "$INDEX_FILE" ]]; then
+    if [[ ! -f "$INDEX_FILE" ]]; then
+        echo "Error: --index-file '$INDEX_FILE' does not exist" >&2
+        exit 1
+    fi
+    if [[ "$NO_TAG" -eq 1 ]]; then
+        echo "Note: --no-tag with --index-file; skipping index update (no tag = no real release)."
+        INDEX_FILE=""
+    fi
+fi
+
 # ---------- rollback trap ----------
 # Stage advances after each step that mutates persistent state. The trap inspects
 # it to undo only what we actually did.
@@ -98,31 +139,35 @@ rollback() {
     [[ $rc -eq 0 ]] && return
     echo >&2
     echo "Script failed (exit $rc) at stage='${STAGE}'. Rolling back..." >&2
+    # Restore index file if we backed it up (orthogonal to git stage).
+    if [[ -n "${INDEX_FILE:-}" && -f "${INDEX_FILE}.bak" ]]; then
+        mv "${INDEX_FILE}.bak" "${INDEX_FILE}" && echo "  - reverted ${INDEX_FILE}" >&2
+    fi
     case "$STAGE" in
         bumped)
             git checkout -- platform.txt && echo "  - reverted platform.txt bump" >&2
             rm -f platform.txt.bak
-            rm -rf "${OUT_DIR}"
+            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
             ;;
         committed)
             git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
-            rm -rf "${OUT_DIR}"
+            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
             ;;
         tagged)
             git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
             git reset --hard HEAD~1 >/dev/null 2>&1 && echo "  - reverted Release commit" >&2
-            rm -rf "${OUT_DIR}"
+            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
             ;;
         tagged_only)
             git tag -d "${TAG}" >/dev/null 2>&1 && echo "  - deleted tag ${TAG}" >&2
-            rm -rf "${OUT_DIR}"
+            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
             ;;
         pushed)
             echo "  - commit + tag already pushed to ${REMOTE}; remote state left intact" >&2
             echo "  - tarball kept at ${OUT_DIR}/${ARCHIVE_NAME} for manual 'gh release create' retry" >&2
             ;;
         *)
-            rm -rf "${OUT_DIR}"
+            rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
             ;;
     esac
 }
@@ -159,7 +204,7 @@ fi
 
 # ---------- stage ----------
 echo "Staging tree to ${OUT_DIR}/${VER_NAME}"
-rm -rf "${OUT_DIR}"
+rm -rf "${OUT_DIR}/${VER_NAME}" "${OUT_DIR}/${ARCHIVE_NAME}"
 mkdir -p "${OUT_DIR}/${VER_NAME}"
 
 # Export only tracked files at HEAD (drops build litter, .git, .vscode, .idea, etc.)
@@ -209,6 +254,47 @@ echo
 echo "--- pinned submodule SHAs ---"
 git submodule status --recursive | awk '{print $1, $2}'
 
+# ---------- index update ----------
+if [[ -n "$INDEX_FILE" ]]; then
+    echo
+    echo "Updating index file: $INDEX_FILE"
+    cp "$INDEX_FILE" "${INDEX_FILE}.bak"
+    python3 - "$INDEX_FILE" "$VERSION" "$ARCHIVE_NAME" "$SHA" "$SIZE" "$RELEASE_URL_BASE" <<'PY'
+import json, sys
+path, ver, fn, sha, size, url_base = sys.argv[1:7]
+with open(path) as f:
+    data = json.load(f)
+pkg = data['packages'][0]
+plats = pkg['platforms']
+if any(p.get('version') == ver for p in plats):
+    print(f"Error: index already has a platforms entry for version={ver}", file=sys.stderr)
+    sys.exit(1)
+# Carry boards / toolsDependencies / category / help / name / architecture
+# from the most recent entry; override the per-release fields.
+new = dict(plats[-1])
+new['version'] = ver
+new['url'] = f"{url_base}/{ver}/{fn}"
+new['archiveFileName'] = fn
+new['checksum'] = f"SHA-256:{sha}"
+new['size'] = size
+plats.append(new)
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+    echo "--- index diff ---"
+    diff -u "${INDEX_FILE}.bak" "$INDEX_FILE" || true
+
+    # If the index lives in a git worktree, record where so --release can
+    # commit + push it. Silent miss is fine — non-git files just stay edited.
+    INDEX_GIT_DIR=""
+    INDEX_BRANCH=""
+    if INDEX_GIT_DIR=$(git -C "$(dirname "$INDEX_FILE")" rev-parse --show-toplevel 2>/dev/null); then
+        INDEX_BRANCH=$(git -C "$INDEX_GIT_DIR" symbolic-ref --short HEAD 2>/dev/null || echo "")
+        echo "Index lives in git worktree ${INDEX_GIT_DIR} (branch: ${INDEX_BRANCH:-detached})"
+    fi
+fi
+
 # ---------- release ----------
 if [[ "$DO_RELEASE" -eq 1 ]]; then
     echo
@@ -219,6 +305,29 @@ if [[ "$DO_RELEASE" -eq 1 ]]; then
     gh release create "${TAG}" "${OUT_DIR}/${ARCHIVE_NAME}" \
         --title "v${VERSION}" \
         --generate-notes
+
+    # If the index is in a git worktree, commit and push it so Board Manager
+    # users get the new version. Done last so a failure here doesn't unpublish
+    # the BSP release.
+    if [[ -n "${INDEX_GIT_DIR:-}" && -n "${INDEX_BRANCH:-}" ]]; then
+        echo
+        echo "Committing index update on ${INDEX_BRANCH}..."
+        git -C "$INDEX_GIT_DIR" add "$(basename "$INDEX_FILE")"
+        git -C "$INDEX_GIT_DIR" commit -m "Update index for v${VERSION}"
+        # Past this point the change is committed; drop .bak so the trap can't
+        # revert the working tree out of sync with HEAD on a later failure.
+        rm -f "${INDEX_FILE}.bak"
+        echo "Pushing ${INDEX_BRANCH}..."
+        if git -C "$INDEX_GIT_DIR" rev-parse --abbrev-ref --symbolic-full-name @{u} >/dev/null 2>&1; then
+            git -C "$INDEX_GIT_DIR" push
+        else
+            git -C "$INDEX_GIT_DIR" push -u origin "${INDEX_BRANCH}"
+        fi
+    fi
+fi
+
+if [[ -n "$INDEX_FILE" && -f "${INDEX_FILE}.bak" ]]; then
+    rm -f "${INDEX_FILE}.bak"
 fi
 
 echo
