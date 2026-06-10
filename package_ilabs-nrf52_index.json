@@ -620,6 +620,68 @@
               "version": "5.7.0"
             }
           ]
+        },
+        {
+          "name": "Adafruit/iLabs nRF52",
+          "architecture": "nrf52",
+          "version": "1.7.101",
+          "category": "iLabs",
+          "url": "https://github.com/PontusO/iLabs_nRF52_Arduino/releases/download/1.7.101/ilabs-nrf52-1.7.101.tar.gz",
+          "archiveFileName": "ilabs-nrf52-1.7.101.tar.gz",
+          "checksum": "SHA-256:6626eb0897e00bc5e8e0ffb46f18912db9134287609149aaa86c7f90804211d6",
+          "size": "22207292",
+          "help": {
+            "online": "https://discord.com/channels/731576543050203147/731576543482216560"
+          },
+          "boards": [
+            {
+              "name": "iLabs Challenger 840 BLE"
+            },
+            {
+              "name": "iLabs Connectivity 840"
+            },
+            {
+              "name": "Adafruit Feather nRF52832"
+            },
+            {
+              "name": "Adafruit Feather nRF52840 Express"
+            },
+            {
+              "name": "Adafruit Feather nRF52840 Sense"
+            },
+            {
+              "name": "Adafruit Circuit Playground Bluefruit"
+            },
+            {
+              "name": "Adafruit Metro nRF52840 Express"
+            },
+            {
+              "name": "Adafruit ItsyBitsy nRF52840"
+            },
+            {
+              "name": "Adafruit CLUE"
+            },
+            {
+              "name": "Adafruit LED Glasses Driver nRF52840"
+            }
+          ],
+          "toolsDependencies": [
+            {
+              "packager": "iLabs",
+              "name": "arm-none-eabi-gcc",
+              "version": "9-2019q4"
+            },
+            {
+              "packager": "iLabs",
+              "name": "nrfjprog",
+              "version": "9.4.0"
+            },
+            {
+              "packager": "iLabs",
+              "name": "CMSIS",
+              "version": "5.7.0"
+            }
+          ]
         }
       ]
     }
