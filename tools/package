@@ -89,7 +89,7 @@ cd "$REPO_ROOT"
 
 VER_NAME="ilabs-nrf52-${VERSION}"
 ARCHIVE_NAME="${VER_NAME}.${EXT}"
-TAG="v${VERSION}"
+TAG="${VERSION}"
 # Default OUT_DIR is OUTSIDE any Arduino hardware/<vendor>/ directory, because
 # Arduino scans hardware/<vendor>/* and tries to load each subdirectory as a
 # BSP — including a staging tree like hardware/ilabs/package/ilabs-nrf52-X.Y.Z/.
