@@ -18,7 +18,7 @@
 
 name=Adafruit/iLabs nRF52 Boards
 # Don't change manually, this is filled in by the packaging script.
-version=1.7.100
+version=1.7.101
 
 # Compile variables
 # -----------------
