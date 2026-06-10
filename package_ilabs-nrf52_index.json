@@ -566,8 +566,8 @@
           "category": "iLabs",
           "url": "https://github.com/PontusO/iLabs_nRF52_Arduino/releases/download/1.7.100/ilabs-nrf52-1.7.100.tar.gz",
           "archiveFileName": "ilabs-nrf52-1.7.100.tar.gz",
-          "checksum": "SHA-256:4dd240f1694959b1fb6b0291a4ad079f5f22e031cf5c5fd3dce0bae12018863a",
-          "size": "22195450",
+          "checksum": "SHA-256:19ce7142dbf1d853182d1340403944af53a1eb4b1e03e73bf5381cf234264a15",
+          "size": "22200570",
           "help": {
             "online": "https://discord.com/channels/731576543050203147/731576543482216560"
           },
