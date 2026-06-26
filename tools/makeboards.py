@@ -125,11 +125,27 @@ def build_ext_mem_menu(name, ext_mem):
     print()
     print("# External memory size")
     if not ext_mem == None:
-        i = 0
         for mem in ext_mem:
-            print("%s.menu.external_mem_size.%s=%s (%s)" % (name, ext_mem[i][0], ext_mem[i][0], ext_mem[i][1]))
-            print("%s.menu.external_mem_size.%s.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=%s" % (name, ext_mem[i][0], ext_mem[i][1]))
-            i += 1
+            # Each ext_mem entry is [label, chip_name] OR
+            # [label, chip_name, user_bytes_hex_str, description].
+            # The 4-element form carries ILABS_QSPI_USER_BYTES through to
+            # firmware -- used by boards where part of the QSPI is
+            # reserved for the bootloader (FOTA double-buffer) and the
+            # application must not write past the boundary. The label
+            # text used as the menu entry comes from `description`.
+            label    = mem[0]
+            chip     = mem[1]
+            user_bytes = mem[2] if len(mem) > 2 else None
+            desc       = mem[3] if len(mem) > 3 else None
+            menu_text  = desc if desc is not None else "%s (%s)" % (label, chip)
+
+            print("%s.menu.external_mem_size.%s=%s" % (name, label, menu_text))
+            if user_bytes is not None:
+                print("%s.menu.external_mem_size.%s.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=%s -DILABS_QSPI_USER_BYTES=%s"
+                      % (name, label, chip, user_bytes))
+            else:
+                print("%s.menu.external_mem_size.%s.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=%s"
+                      % (name, label, chip))
 
 def build_global_menu():
     print("menu.softdevice=SoftDevice")
@@ -232,7 +248,20 @@ thirdparty_boards_list = [
            ilabs_qspi_bl_overrides],
 
     [52840, "connectivity_840", "connectivity_840", "iLabs", "Connectivity 840", "CONNECTIVITY_840",
-           "0x1209", ["0x7384", "0x7385"], [["0MB", "None"], ["8MB", "W25Q64JV_IM"]],
+           "0x1209", ["0x7384", "0x7385"],
+           [
+             # [label, chip_name, ILABS_QSPI_USER_BYTES (optional), menu description (optional)]
+             #
+             # The "6MB" option is the recommended user-facing budget on this board:
+             # the W25Q64JV chip is still 8 MB at silicon and is detected at full size
+             # at boot, but the top 2 MB (0x600000..0x7FFFFF) is reserved for the iLabs
+             # FOTA bootloader's double-buffer (download + backup slots + settings).
+             # ILABS_QSPI_USER_BYTES propagates the user-region budget into firmware so
+             # log_manager / future LittleFS / etc. refuse to write past the boundary.
+             ["0MB", "None"],
+             ["6MB", "W25Q64JV_IM", "0x600000", "6MB (W25Q64JV_IM, 2MB reserved for FOTA bootloader)"],
+             ["8MB", "W25Q64JV_IM", "0x800000", "8MB (W25Q64JV_IM, no FOTA reservation)"],
+           ],
            ilabs_qspi_bl_overrides],
 ]
 

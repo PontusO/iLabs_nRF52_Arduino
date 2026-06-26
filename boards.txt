@@ -266,5 +266,7 @@ connectivity_840.menu.debug_output.rtt.build.logger_flags=-DCFG_LOGGER=2 -DCFG_T
 # External memory size
 connectivity_840.menu.external_mem_size.0MB=0MB (None)
 connectivity_840.menu.external_mem_size.0MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=None
-connectivity_840.menu.external_mem_size.8MB=8MB (W25Q64JV_IM)
-connectivity_840.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM
+connectivity_840.menu.external_mem_size.6MB=6MB (W25Q64JV_IM, 2MB reserved for FOTA bootloader)
+connectivity_840.menu.external_mem_size.6MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM -DILABS_QSPI_USER_BYTES=0x600000
+connectivity_840.menu.external_mem_size.8MB=8MB (W25Q64JV_IM, no FOTA reservation)
+connectivity_840.menu.external_mem_size.8MB.build.ext_mem_flags=-DEXTERNAL_FLASH_DEVICES=W25Q64JV_IM -DILABS_QSPI_USER_BYTES=0x800000

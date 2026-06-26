@@ -332,7 +332,28 @@ void nrfx_qspi_uninit(void)
 
     nrf_qspi_int_disable(NRF_QSPI, NRF_QSPI_INT_READY_MASK);
 
+    /* iLabs patch (2026-06-18): wait for EVENTS_READY between
+     * TASKS_DEACTIVATE and ENABLE=0. Stock nrfx triggers DEACTIVATE
+     * then immediately disables ENABLE without polling -- every
+     * other nrfx_qspi op uses qspi_ready_wait() for synchronization,
+     * uninit was the lone exception. The result: peripheral ends up
+     * half-deactivated, the next nrfx_qspi_init() succeeds on paper
+     * (qspi_ready_wait() after TASKS_ACTIVATE returns OK) but JEDEC
+     * reads silently return 0xFF and the next chip detection fails.
+     */
+    nrf_qspi_event_clear(NRF_QSPI, NRF_QSPI_EVENT_READY);
     nrf_qspi_task_trigger(NRF_QSPI, NRF_QSPI_TASK_DEACTIVATE);
+    {
+        /* ~10 ms safety cap. Deactivation normally completes in
+         * a few microseconds; the bound exists only to keep us
+         * from spinning forever if the hardware is wedged. */
+        uint32_t spin = 100000;
+        while (!nrf_qspi_event_check(NRF_QSPI, NRF_QSPI_EVENT_READY)
+               && spin-- > 0)
+        {
+            /* tight poll */
+        }
+    }
 
     nrf_qspi_disable(NRF_QSPI);
 
