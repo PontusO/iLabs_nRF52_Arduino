@@ -63,6 +63,14 @@ class Uart : public HardwareSerial
       return _begun;
     }
 
+    // Cumulative count of UARTE RX overruns since begin()/clear -- bytes the
+    // hardware dropped because the RX FIFO/DMA overflowed before the ISR could
+    // service it (i.e. under heavy interrupt latency). 0 == no loss. Additive
+    // diagnostic; the rest of the HardwareSerial API is unchanged. Handy for
+    // validating and tuning RX robustness under contention.
+    uint32_t getRxOverruns() const { return _rxOverruns; }
+    void     clearRxOverruns()     { _rxOverruns = 0; }
+
   private:
     // Idle-flush: drains a partially-filled RX DMA buffer once the line goes
     // quiet, so short/partial lines surface via available()/read() promptly
@@ -74,8 +82,9 @@ class Uart : public HardwareSerial
     NRF_UARTE_Type *nrfUart;
     RingBuffer rxBuffer;
     uint8_t rxDma[2][UART_RX_DMA_SIZE];   // ping-pong EasyDMA RX buffers
-    volatile uint8_t _rxIdx;              // which buffer is currently filling (0/1)
-    volatile bool    _rxActivity;         // RXDRDY seen since last idle flush
+    volatile uint8_t  _rxIdx;             // which buffer is currently filling (0/1)
+    volatile bool     _rxActivity;        // RXDRDY seen since last idle flush
+    volatile uint32_t _rxOverruns;        // cumulative UARTE RX overrun count
     TimerHandle_t    _rxFlushTimer;
     uint8_t txBuffer[SERIAL_BUFFER_SIZE];
 

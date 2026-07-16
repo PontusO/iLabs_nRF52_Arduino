@@ -47,6 +47,7 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
   _begun = false;
   _rxIdx = 0;
   _rxActivity = false;
+  _rxOverruns = 0;
   _rxFlushTimer = NULL;
 }
 
@@ -64,6 +65,7 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
   _begun = false;
   _rxIdx = 0;
   _rxActivity = false;
+  _rxOverruns = 0;
   _rxFlushTimer = NULL;
 }
 
@@ -140,16 +142,19 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   // buffer to the ring. Partial (short) lines are surfaced by rxFlushTick().
   _rxIdx = 0;
   _rxActivity = false;
+  _rxOverruns = 0;
   nrfUart->EVENTS_ENDRX     = 0x0UL;
   nrfUart->EVENTS_RXSTARTED = 0x0UL;
   nrfUart->EVENTS_RXDRDY    = 0x0UL;
+  nrfUart->EVENTS_ERROR     = 0x0UL;
+  nrfUart->ERRORSRC         = nrfUart->ERRORSRC;   // write-1-to-clear stale bits
   nrfUart->RXD.PTR    = (uint32_t)rxDma[0];
   nrfUart->RXD.MAXCNT = UART_RX_DMA_SIZE;
   nrfUart->SHORTS     = UARTE_SHORTS_ENDRX_STARTRX_Msk;
   nrfUart->TASKS_STARTRX = 0x1UL;
 
   nrfUart->INTENSET = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_RXSTARTED_Msk
-                    | UARTE_INTENSET_ENDTX_Msk;
+                    | UARTE_INTENSET_ERROR_Msk | UARTE_INTENSET_ENDTX_Msk;
 
   NVIC_ClearPendingIRQ(IRQn);
   NVIC_SetPriority(IRQn, 3);
@@ -181,7 +186,7 @@ void Uart::end()
   NVIC_DisableIRQ(IRQn);
 
   nrfUart->INTENCLR = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_RXSTARTED_Msk
-                    | UARTE_INTENSET_ENDTX_Msk;
+                    | UARTE_INTENSET_ERROR_Msk | UARTE_INTENSET_ENDTX_Msk;
 
   nrfUart->SHORTS = 0;   // stop ENDRX->STARTRX so STOPRX actually stops RX
 
@@ -249,6 +254,15 @@ void Uart::IrqHandler()
   {
     nrfUart->EVENTS_ENDTX = 0x0UL;
     xSemaphoreGiveFromISR(_end_tx_sem, NULL);
+  }
+
+  // RX error: count overruns (bytes lost to FIFO/DMA overflow under latency).
+  if (nrfUart->EVENTS_ERROR)
+  {
+    nrfUart->EVENTS_ERROR = 0x0UL;
+    uint32_t src = nrfUart->ERRORSRC;
+    nrfUart->ERRORSRC = src;                     // write-1-to-clear
+    if (src & UARTE_ERRORSRC_OVERRUN_Msk) _rxOverruns++;
   }
 }
 
