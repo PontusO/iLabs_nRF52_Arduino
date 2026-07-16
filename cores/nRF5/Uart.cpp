@@ -45,6 +45,9 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
 
   _end_tx_sem = NULL;
   _begun = false;
+  _rxIdx = 0;
+  _rxActivity = false;
+  _rxFlushTimer = NULL;
 }
 
 Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _pinTX, uint8_t _pinCTS, uint8_t _pinRTS)
@@ -59,6 +62,9 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
 
   _end_tx_sem = NULL;
   _begun = false;
+  _rxIdx = 0;
+  _rxActivity = false;
+  _rxFlushTimer = NULL;
 }
 
 void Uart::setPins(uint8_t pin_rx, uint8_t pin_tx)
@@ -127,11 +133,23 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   nrfUart->TXD.PTR = (uint32_t)txBuffer;
   nrfUart->EVENTS_ENDTX = 0x0UL;
 
-  nrfUart->RXD.PTR = (uint32_t)&rxRcv;
-  nrfUart->RXD.MAXCNT = 1;
+  // Double-buffered continuous RX. The ENDRX->STARTRX short lets the hardware
+  // re-arm reception into the next buffer with no ISR in the loop, so a burst
+  // keeps landing in RAM even while the RX ISR is starved. RXSTARTED queues the
+  // OTHER buffer as the next DMA target (ping-pong); ENDRX drains a filled
+  // buffer to the ring. Partial (short) lines are surfaced by rxFlushTick().
+  _rxIdx = 0;
+  _rxActivity = false;
+  nrfUart->EVENTS_ENDRX     = 0x0UL;
+  nrfUart->EVENTS_RXSTARTED = 0x0UL;
+  nrfUart->EVENTS_RXDRDY    = 0x0UL;
+  nrfUart->RXD.PTR    = (uint32_t)rxDma[0];
+  nrfUart->RXD.MAXCNT = UART_RX_DMA_SIZE;
+  nrfUart->SHORTS     = UARTE_SHORTS_ENDRX_STARTRX_Msk;
   nrfUart->TASKS_STARTRX = 0x1UL;
 
-  nrfUart->INTENSET = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ENDTX_Msk;
+  nrfUart->INTENSET = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_RXSTARTED_Msk
+                    | UARTE_INTENSET_ENDTX_Msk;
 
   NVIC_ClearPendingIRQ(IRQn);
   NVIC_SetPriority(IRQn, 3);
@@ -140,13 +158,32 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   _end_tx_sem = xSemaphoreCreateBinary();
   xSemaphoreGive(_end_tx_sem);
   _begun = true;
+
+  // ~1 ms idle-flush tick (see rxFlushTick). Created after _begun so the
+  // callback is safe to run immediately.
+  _rxFlushTimer = xTimerCreate("uartRxFlush", pdMS_TO_TICKS(1) ? pdMS_TO_TICKS(1) : 1,
+                               pdTRUE, this, Uart::rxFlushTimerCb);
+  if (_rxFlushTimer) xTimerStart(_rxFlushTimer, 0);
 }
 
 void Uart::end()
 {
+  // Stop + delete the idle-flush timer first, and drop _begun, so its callback
+  // can't touch the UARTE while we tear it down.
+  _begun = false;
+  if (_rxFlushTimer)
+  {
+    xTimerStop(_rxFlushTimer, portMAX_DELAY);
+    xTimerDelete(_rxFlushTimer, portMAX_DELAY);
+    _rxFlushTimer = NULL;
+  }
+
   NVIC_DisableIRQ(IRQn);
 
-  nrfUart->INTENCLR = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_ENDTX_Msk;
+  nrfUart->INTENCLR = UARTE_INTENSET_ENDRX_Msk | UARTE_INTENSET_RXSTARTED_Msk
+                    | UARTE_INTENSET_ENDTX_Msk;
+
+  nrfUart->SHORTS = 0;   // stop ENDRX->STARTRX so STOPRX actually stops RX
 
   nrfUart->EVENTS_RXTO = 0;
   nrfUart->EVENTS_TXSTOPPED = 0;
@@ -184,14 +221,28 @@ void Uart::flush()
 
 void Uart::IrqHandler()
 {
+  // A DMA buffer completed (filled to MAXCNT, or ended by rxFlushTick's STOPRX).
+  // Drain it to the ring and advance to the buffer the short is now filling.
+  // Handle ENDRX BEFORE RXSTARTED so, when both are pending (ISR ran late), we
+  // advance _rxIdx first and then queue the correct next buffer.
   if (nrfUart->EVENTS_ENDRX)
   {
     nrfUart->EVENTS_ENDRX = 0x0UL;
-    if (nrfUart->RXD.AMOUNT)
+    uint32_t amount = nrfUart->RXD.AMOUNT;
+    const uint8_t* buf = rxDma[_rxIdx];
+    for (uint32_t i = 0; i < amount; i++)
     {
-      rxBuffer.store_char(rxRcv);
+      rxBuffer.store_char(buf[i]);
     }
-    nrfUart->TASKS_STARTRX = 0x1UL;
+    _rxIdx ^= 1;
+  }
+
+  // Reception into a new buffer has started: point the NEXT transfer (the one
+  // the ENDRX->STARTRX short will trigger) at the other buffer -- ping-pong.
+  if (nrfUart->EVENTS_RXSTARTED)
+  {
+    nrfUart->EVENTS_RXSTARTED = 0x0UL;
+    nrfUart->RXD.PTR = (uint32_t)rxDma[_rxIdx ^ 1];
   }
 
   if (nrfUart->EVENTS_ENDTX)
@@ -199,6 +250,63 @@ void Uart::IrqHandler()
     nrfUart->EVENTS_ENDTX = 0x0UL;
     xSemaphoreGiveFromISR(_end_tx_sem, NULL);
   }
+}
+
+// ~1 ms tick: surface a partially-filled RX buffer once the line goes quiet.
+// The ENDRX interrupt only fires on a FULL buffer, so without this a short line
+// (e.g. "OK\r\n") would sit in DMA until more bytes arrive. RXDRDY is set for
+// every received byte; we treat "RXDRDY since last tick" as "still arriving" and
+// only flush on a quiet tick, so STOPRX never races an in-flight byte.
+void Uart::rxFlushTick()
+{
+  if (!_begun) return;
+
+  if (nrfUart->EVENTS_RXDRDY)
+  {
+    nrfUart->EVENTS_RXDRDY = 0x0UL;
+    _rxActivity = true;                 // bytes arriving; let the burst run
+    return;
+  }
+  if (!_rxActivity) return;             // idle and nothing new since last flush
+  _rxActivity = false;
+
+  // Quiet interval after activity: flush the current partial buffer. Take the
+  // short down so stop/restart is deterministic, and mask the RX ISR so it
+  // can't race the manual sequence. Because the line is quiet, no in-flight
+  // byte is lost across the STOPRX/STARTRX.
+  NVIC_DisableIRQ(IRQn);
+
+  nrfUart->SHORTS       = 0;
+  nrfUart->EVENTS_ENDRX = 0x0UL;
+  nrfUart->TASKS_STOPRX = 0x1UL;
+  uint32_t guard = 0;
+  while (!nrfUart->EVENTS_ENDRX && ++guard < 100000) { }
+  nrfUart->EVENTS_ENDRX = 0x0UL;
+
+  uint32_t amount = nrfUart->RXD.AMOUNT;
+  const uint8_t* buf = rxDma[_rxIdx];
+  for (uint32_t i = 0; i < amount; i++)
+  {
+    rxBuffer.store_char(buf[i]);
+  }
+
+  // Re-arm: refill the same buffer and restore the short. The RXSTARTED that
+  // STARTRX raises will queue the other buffer as before.
+  nrfUart->EVENTS_RXSTARTED = 0x0UL;
+  nrfUart->EVENTS_ENDRX     = 0x0UL;
+  nrfUart->EVENTS_RXTO      = 0x0UL;
+  nrfUart->RXD.PTR    = (uint32_t)rxDma[_rxIdx];
+  nrfUart->RXD.MAXCNT = UART_RX_DMA_SIZE;
+  nrfUart->SHORTS     = UARTE_SHORTS_ENDRX_STARTRX_Msk;
+  nrfUart->TASKS_STARTRX = 0x1UL;
+
+  NVIC_EnableIRQ(IRQn);
+}
+
+void Uart::rxFlushTimerCb(TimerHandle_t t)
+{
+  Uart* self = (Uart*)pvTimerGetTimerID(t);
+  if (self) self->rxFlushTick();
 }
 
 int Uart::available()

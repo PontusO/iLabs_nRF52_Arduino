@@ -28,6 +28,15 @@
 
 #include <cstddef>
 
+// RX EasyDMA buffer size (per ping-pong buffer). The receiver double-buffers
+// with an ENDRX->STARTRX hardware short, so the UARTE can DMA up to this many
+// bytes into RAM with NO per-byte ISR -- tolerating that many bytes' worth of
+// interrupt latency before an overrun (vs. ~4-6 bytes with the old 1-byte DMA).
+// At 115200 baud, 128 bytes ~= 11 ms of ISR-latency headroom.
+#ifndef UART_RX_DMA_SIZE
+#define UART_RX_DMA_SIZE 128
+#endif
+
 class Uart : public HardwareSerial
 {
   public:
@@ -55,9 +64,19 @@ class Uart : public HardwareSerial
     }
 
   private:
+    // Idle-flush: drains a partially-filled RX DMA buffer once the line goes
+    // quiet, so short/partial lines surface via available()/read() promptly
+    // (the ENDRX interrupt alone only fires on a FULL buffer). Runs off a ~1 ms
+    // FreeRTOS software timer; entirely internal -- the public API is unchanged.
+    void rxFlushTick();
+    static void rxFlushTimerCb(TimerHandle_t t);
+
     NRF_UARTE_Type *nrfUart;
     RingBuffer rxBuffer;
-    uint8_t rxRcv;
+    uint8_t rxDma[2][UART_RX_DMA_SIZE];   // ping-pong EasyDMA RX buffers
+    volatile uint8_t _rxIdx;              // which buffer is currently filling (0/1)
+    volatile bool    _rxActivity;         // RXDRDY seen since last idle flush
+    TimerHandle_t    _rxFlushTimer;
     uint8_t txBuffer[SERIAL_BUFFER_SIZE];
 
     IRQn_Type IRQn;
