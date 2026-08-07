@@ -80,8 +80,12 @@ class Adafruit_LittleFS
      * code. User should not call these directly
      *------------------------------------------------------------------*/
     lfs_t* _getFS   (void) { return &_lfs; }
-    void   _lockFS  (void) { xSemaphoreTake(_mutex,  portMAX_DELAY); }
-    void   _unlockFS(void) { xSemaphoreGive(_mutex); }
+    void   _lockFS  (void) { xSemaphoreTake(_mutex,  portMAX_DELAY); _active_instance = this; }
+    void   _unlockFS(void) { _active_instance = NULL; xSemaphoreGive(_mutex); }
+
+    // Instance currently holding its filesystem mutex (NULL if none).
+    // Internal, exposed for assert attribution.
+    static Adafruit_LittleFS* volatile _active_instance;
 
   protected:
     bool _mounted;
@@ -102,5 +106,12 @@ class Adafruit_LittleFS
 
   const char* dbg_strerr_lfs (int32_t err);
 #endif
+
+// Instance currently holding its filesystem mutex (NULL if none).
+// Best effort: with two instances active on two tasks simultaneously
+// the value reflects the most recent locker. Used by assert handlers
+// to attribute an lfs assert to a filesystem; misattribution is
+// handled by the app's catch-all recovery.
+Adafruit_LittleFS* Adafruit_LittleFS_activeInstance(void);
 
 #endif /* ADAFRUIT_LITTLEFS_H_ */

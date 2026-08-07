@@ -30,6 +30,12 @@
 
 using namespace Adafruit_LittleFS_Namespace;
 
+Adafruit_LittleFS* volatile Adafruit_LittleFS::_active_instance = NULL;
+
+Adafruit_LittleFS* Adafruit_LittleFS_activeInstance(void)
+{
+  return Adafruit_LittleFS::_active_instance;
+}
 
 //--------------------------------------------------------------------+
 // Implementation

@@ -148,6 +148,16 @@ SECTIONS
         __bss_end__ = .;
     } > RAM
 
+    /* Not zeroed at startup: survives soft/WDT resets. Used by the
+     * app-layer boot-health ladder. Contents are garbage after a
+     * power-on reset; consumers must validate with a magic + CRC. */
+    .noinit (NOLOAD) :
+    {
+        . = ALIGN(4);
+        *(.noinit*)
+        . = ALIGN(4);
+    } > RAM
+
     .heap :
     {
         __HeapBase = .;
