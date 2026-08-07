@@ -34,6 +34,16 @@ class InternalFileSystem : public Adafruit_LittleFS
 
     // overwrite to also perform low level format (sector erase of whole flash region)
     bool begin(void);
+
+    // Erase every page of the LFS region (no format). Recovery helper:
+    // call before begin() to guarantee a fresh format on a corrupt or
+    // worn filesystem.
+    void eraseAll(void);
+
+    // TEST ONLY: overwrite the superblock/directory-pair area with a
+    // garbage pattern so the next mount exercises the corrupt-fs
+    // recovery path (historically: assert in lfs_cache_read).
+    void corruptForTest(void);
 };
 
 extern InternalFileSystem InternalFS;

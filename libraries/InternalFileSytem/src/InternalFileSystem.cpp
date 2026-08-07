@@ -27,13 +27,19 @@
 
 #if defined(ARDUINO_CONNECTIVITY_840) || defined(ARDUINO_CHALLENGER_840_BLE)
   // Boards using the iLabs/QSPI-variant Adafruit nRF52 bootloader at
-  // 0x000F0000 (shifted 16 KB down from 0x000F4000 to fit the QSPI backup
-  // driver). LFS spans the full 40 KB app-data region the bootloader
-  // reserves -- the partition end MUST equal the bootloader region start,
-  // or the first LFS write erases the bootloader's reset vector and the
-  // unit is unrecoverable without SWD.
-  #define LFS_FLASH_ADDR        0xE6000
-  #define LFS_FLASH_TOTAL_SIZE  (10*FLASH_NRF52_PAGE_SIZE)
+  // 0x000F0000. LFS occupies the TOP of the app-data region the
+  // bootloader reserves; the partition end MUST equal the bootloader
+  // region start, or the first LFS write erases the bootloader's reset
+  // vector and the unit is unrecoverable without SWD.
+  //
+  // 2026-08: region start moved 0xE6000 -> 0xE7000 (10 -> 9 pages).
+  // Fleet units accumulated ~10k erase cycles (the nRF52840 endurance
+  // spec) on the first page via per-uplink littlefs metadata rewrites;
+  // the first page of the region is retired, the page at 0xE6000 is
+  // now owned by nobody. Existing filesystems fail to mount at the new
+  // offset and are reformatted by begin()'s fallback.
+  #define LFS_FLASH_ADDR        0xE7000
+  #define LFS_FLASH_TOTAL_SIZE  (9*FLASH_NRF52_PAGE_SIZE)
   static_assert((LFS_FLASH_ADDR + LFS_FLASH_TOTAL_SIZE) == 0xF0000,
                 "LFS partition end must equal QSPI-variant bootloader region start (0xF0000)");
 #elif defined(NRF52840_XXAA)
@@ -142,16 +148,36 @@ InternalFileSystem::InternalFileSystem(void)
 
 }
 
+void InternalFileSystem::eraseAll(void)
+{
+  for ( uint32_t addr = LFS_FLASH_ADDR; addr < LFS_FLASH_ADDR + LFS_FLASH_TOTAL_SIZE; addr += FLASH_NRF52_PAGE_SIZE )
+  {
+    flash_nrf5x_erase(addr);
+  }
+  flash_nrf5x_flush();
+}
+
+void InternalFileSystem::corruptForTest(void)
+{
+  // Deterministic garbage over lfs blocks 1..5 (offset 128..767):
+  // clobbers one superblock copy + the root directory pair while
+  // leaving enough structure that mount attempts to parse it.
+  uint8_t junk[128];
+  for ( uint32_t i = 0; i < sizeof(junk); i++ ) junk[i] = (uint8_t)(0xA5u ^ (i * 7u));
+  for ( uint32_t blk = 1; blk <= 5; blk++ )
+  {
+    flash_nrf5x_write(LFS_FLASH_ADDR + blk * LFS_BLOCK_SIZE, junk, sizeof(junk));
+  }
+  flash_nrf5x_flush();
+}
+
 bool InternalFileSystem::begin(void)
 {
   // failed to mount, erase all sector then format and mount again
   if ( !Adafruit_LittleFS::begin() )
   {
     // Erase all sectors of internal flash region for Filesystem.
-    for ( uint32_t addr = LFS_FLASH_ADDR; addr < LFS_FLASH_ADDR + LFS_FLASH_TOTAL_SIZE; addr += FLASH_NRF52_PAGE_SIZE )
-    {
-      VERIFY( flash_nrf5x_erase(addr) );
-    }
+    eraseAll();
 
     // lfs format
     this->format();
