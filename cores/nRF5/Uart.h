@@ -37,6 +37,27 @@
 #define UART_RX_DMA_SIZE 128
 #endif
 
+// Idle-flush quiet threshold, in whole RTOS ticks (1024 Hz -> ~2 ms). The RX
+// line must have shown no RXDRDY for this long before a partially-filled DMA
+// buffer is flushed to the ring. Must be >= 2: FreeRTOS replays missed
+// auto-reload periods back to back, and every replayed callback reads the same
+// tick count, so a tick-count threshold is what stops a late tick from
+// flushing (and stopping RX on) a line that is still live.
+#ifndef UART_RX_IDLE_TICKS
+#define UART_RX_IDLE_TICKS 2
+#endif
+
+// Scratch buffer for TASKS_FLUSHRX. The UARTE keeps a 4-byte internal RX FIFO
+// that still accepts bytes after STOPRX; FLUSHRX moves it into RAM. 8 leaves
+// margin above the hardware size.
+#define UART_RX_FIFO_FLUSH_BYTES 8
+
+// Bounded spin for RXTO / FLUSHRX completion inside the stop sequence. RXTO on
+// an idle line is immediate; with a byte in flight it takes one byte time
+// (87 us at 115200, ~1 ms at 9600). 50000 iterations is several ms at 64 MHz,
+// a hardware-misbehaviour backstop, not a path that is expected to run.
+#define UART_RX_STOP_GUARD 50000
+
 class Uart : public HardwareSerial
 {
   public:
@@ -71,12 +92,21 @@ class Uart : public HardwareSerial
     uint32_t getRxOverruns() const { return _rxOverruns; }
     void     clearRxOverruns()     { _rxOverruns = 0; }
 
+    // Cumulative count of bytes recovered from the UARTE internal RX FIFO by
+    // FLUSHRX during idle-flush stop/restart cycles. Each one is a byte that
+    // arrived while reception was being stopped and would have been lost by a
+    // STOPRX/STARTRX without the flush. Diagnostic; 0 is normal on a quiet
+    // line, non-zero is the safety net doing its job.
+    uint32_t getRxFifoRescued() const { return _rxFifoRescued; }
+
   private:
     // Idle-flush: drains a partially-filled RX DMA buffer once the line goes
     // quiet, so short/partial lines surface via available()/read() promptly
     // (the ENDRX interrupt alone only fires on a FULL buffer). Runs off a ~1 ms
     // FreeRTOS software timer; entirely internal -- the public API is unchanged.
     void rxFlushTick();
+    void rxStopFlushRestart();
+    void rxDrainDma(uint8_t idx, uint32_t amount);
     static void rxFlushTimerCb(TimerHandle_t t);
 
     NRF_UARTE_Type *nrfUart;
@@ -84,7 +114,10 @@ class Uart : public HardwareSerial
     uint8_t rxDma[2][UART_RX_DMA_SIZE];   // ping-pong EasyDMA RX buffers
     volatile uint8_t  _rxIdx;             // which buffer is currently filling (0/1)
     volatile bool     _rxActivity;        // RXDRDY seen since last idle flush
+    volatile TickType_t _rxLastTick;      // tick count when RXDRDY was last seen
     volatile uint32_t _rxOverruns;        // cumulative UARTE RX overrun count
+    volatile uint32_t _rxFifoRescued;     // bytes recovered via FLUSHRX (see getter)
+    uint8_t rxFlush[UART_RX_FIFO_FLUSH_BYTES]; // FLUSHRX scratch target
     TimerHandle_t    _rxFlushTimer;
     uint8_t txBuffer[SERIAL_BUFFER_SIZE];
 

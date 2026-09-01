@@ -47,7 +47,9 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
   _begun = false;
   _rxIdx = 0;
   _rxActivity = false;
+  _rxLastTick = 0;
   _rxOverruns = 0;
+  _rxFifoRescued = 0;
   _rxFlushTimer = NULL;
 }
 
@@ -65,7 +67,9 @@ Uart::Uart(NRF_UARTE_Type *_nrfUart, IRQn_Type _IRQn, uint8_t _pinRX, uint8_t _p
   _begun = false;
   _rxIdx = 0;
   _rxActivity = false;
+  _rxLastTick = 0;
   _rxOverruns = 0;
+  _rxFifoRescued = 0;
   _rxFlushTimer = NULL;
 }
 
@@ -142,7 +146,9 @@ void Uart::begin(unsigned long baudrate, uint16_t config)
   // buffer to the ring. Partial (short) lines are surfaced by rxFlushTick().
   _rxIdx = 0;
   _rxActivity = false;
+  _rxLastTick = xTaskGetTickCount();
   _rxOverruns = 0;
+  _rxFifoRescued = 0;
   nrfUart->EVENTS_ENDRX     = 0x0UL;
   nrfUart->EVENTS_RXSTARTED = 0x0UL;
   nrfUart->EVENTS_RXDRDY    = 0x0UL;
@@ -233,12 +239,7 @@ void Uart::IrqHandler()
   if (nrfUart->EVENTS_ENDRX)
   {
     nrfUart->EVENTS_ENDRX = 0x0UL;
-    uint32_t amount = nrfUart->RXD.AMOUNT;
-    const uint8_t* buf = rxDma[_rxIdx];
-    for (uint32_t i = 0; i < amount; i++)
-    {
-      rxBuffer.store_char(buf[i]);
-    }
+    rxDrainDma(_rxIdx, nrfUart->RXD.AMOUNT);
     _rxIdx ^= 1;
   }
 
@@ -266,55 +267,132 @@ void Uart::IrqHandler()
   }
 }
 
+// Copy a completed (or stopped) RX DMA buffer into the ring.
+void Uart::rxDrainDma(uint8_t idx, uint32_t amount)
+{
+  if (amount > UART_RX_DMA_SIZE) amount = UART_RX_DMA_SIZE;   // never trust a stale AMOUNT
+  const uint8_t* buf = rxDma[idx];
+  for (uint32_t i = 0; i < amount; i++)
+  {
+    rxBuffer.store_char(buf[i]);
+  }
+}
+
 // ~1 ms tick: surface a partially-filled RX buffer once the line goes quiet.
 // The ENDRX interrupt only fires on a FULL buffer, so without this a short line
-// (e.g. "OK\r\n") would sit in DMA until more bytes arrive. RXDRDY is set for
-// every received byte; we treat "RXDRDY since last tick" as "still arriving" and
-// only flush on a quiet tick, so STOPRX never races an in-flight byte.
+// (e.g. "OK\r\n") would sit in DMA until more bytes arrive.
+//
+// Quiet detection is TIME based, not callback-count based. RXDRDY is set for
+// every received byte; each tick that sees it stamps the current tick count,
+// and a flush is only considered once UART_RX_IDLE_TICKS whole ticks have
+// passed since that stamp. This matters because FreeRTOS auto-reload timers
+// replay missed periods back to back: if the timer service task is held off
+// for N ticks (BLE task, an IRQ-masked stretch in a radio driver, ...) this
+// callback runs N times within microseconds. The previous "no RXDRDY since the
+// last callback" test then declared a live 115200-baud line (one byte every
+// 87 us) quiet and stopped RX mid-byte, dropping the byte in flight. Replayed
+// callbacks all read the same tick count, so they can no longer flush.
 void Uart::rxFlushTick()
 {
   if (!_begun) return;
+
+  const TickType_t now = xTaskGetTickCount();
 
   if (nrfUart->EVENTS_RXDRDY)
   {
     nrfUart->EVENTS_RXDRDY = 0x0UL;
     _rxActivity = true;                 // bytes arriving; let the burst run
+    _rxLastTick = now;
     return;
   }
   if (!_rxActivity) return;             // idle and nothing new since last flush
+  if ((TickType_t)(now - _rxLastTick) < (TickType_t)UART_RX_IDLE_TICKS) return;
   _rxActivity = false;
 
-  // Quiet interval after activity: flush the current partial buffer. Take the
-  // short down so stop/restart is deterministic, and mask the RX ISR so it
-  // can't race the manual sequence. Because the line is quiet, no in-flight
-  // byte is lost across the STOPRX/STARTRX.
+  rxStopFlushRestart();
+}
+
+// Stop reception, hand every byte the UARTE holds to the ring, restart.
+//
+// Runs inside a FreeRTOS critical section (which also masks this UARTE's IRQ
+// at priority 3) so neither the RX ISR nor another task can touch the
+// peripheral between STOPRX and STARTRX. Even when the quiet test above is
+// wrong and a byte is on the wire, nothing is lost: the UARTE keeps receiving
+// into its 4-byte internal FIFO after STOPRX, and FLUSHRX moves that FIFO into
+// RAM before reception is re-armed. Sequence per the nRF52840 PS (STOPRX ->
+// ENDRX -> RXTO, then FLUSHRX) and nrfx_uarte. Bounded: one byte time plus a
+// <= 128-byte copy.
+void Uart::rxStopFlushRestart()
+{
+  taskENTER_CRITICAL();
   NVIC_DisableIRQ(IRQn);
 
-  nrfUart->SHORTS       = 0;
-  nrfUart->EVENTS_ENDRX = 0x0UL;
-  nrfUart->TASKS_STOPRX = 0x1UL;
-  uint32_t guard = 0;
-  while (!nrfUart->EVENTS_ENDRX && ++guard < 100000) { }
-  nrfUart->EVENTS_ENDRX = 0x0UL;
+  // 1. Take the auto-restart short down so STOPRX is final.
+  nrfUart->SHORTS = 0;
 
-  uint32_t amount = nrfUart->RXD.AMOUNT;
-  const uint8_t* buf = rxDma[_rxIdx];
-  for (uint32_t i = 0; i < amount; i++)
+  // 2. Service what the ISR would have: a buffer that filled just before we
+  //    got here (its ENDRX still pending). Done first so _rxIdx names the
+  //    transfer that is actually running when we stop it.
+  if (nrfUart->EVENTS_ENDRX)
   {
-    rxBuffer.store_char(buf[i]);
+    nrfUart->EVENTS_ENDRX = 0x0UL;
+    rxDrainDma(_rxIdx, nrfUart->RXD.AMOUNT);
+    _rxIdx ^= 1;
+  }
+  nrfUart->EVENTS_RXSTARTED = 0x0UL;
+
+  // 3. Stop and wait for RXTO. The UARTE guarantees the running transfer's
+  //    ENDRX (with a valid RXD.AMOUNT) is generated before RXTO.
+  nrfUart->EVENTS_RXTO = 0x0UL;
+  nrfUart->TASKS_STOPRX = 0x1UL;
+  for (uint32_t guard = 0; !nrfUart->EVENTS_RXTO && guard < UART_RX_STOP_GUARD; guard++) { __NOP(); }
+  nrfUart->EVENTS_RXTO = 0x0UL;
+  if (nrfUart->EVENTS_ENDRX)
+  {
+    nrfUart->EVENTS_ENDRX = 0x0UL;
+    rxDrainDma(_rxIdx, nrfUart->RXD.AMOUNT);
   }
 
-  // Re-arm: refill the same buffer and restore the short. The RXSTARTED that
-  // STARTRX raises will queue the other buffer as before.
-  nrfUart->EVENTS_RXSTARTED = 0x0UL;
-  nrfUart->EVENTS_ENDRX     = 0x0UL;
-  nrfUart->EVENTS_RXTO      = 0x0UL;
+  // 4. Flush the internal RX FIFO into scratch. RXD.AMOUNT is not refreshed by
+  //    FLUSHRX when the FIFO was empty (it then still reports the previous
+  //    transfer's count), so the scratch is pre-filled with a pattern: a count
+  //    larger than the scratch, or one whose bytes all still hold the pattern,
+  //    is treated as "nothing flushed".
+  for (uint32_t i = 0; i < UART_RX_FIFO_FLUSH_BYTES; i++) rxFlush[i] = (i & 1) ? 0x55 : 0xAA;
+  nrfUart->RXD.PTR    = (uint32_t)rxFlush;
+  nrfUart->RXD.MAXCNT = UART_RX_FIFO_FLUSH_BYTES;
+  nrfUart->EVENTS_ENDRX = 0x0UL;
+  nrfUart->TASKS_FLUSHRX = 0x1UL;
+  for (uint32_t guard = 0; !nrfUart->EVENTS_ENDRX && guard < UART_RX_STOP_GUARD; guard++) { __NOP(); }
+  nrfUart->EVENTS_ENDRX = 0x0UL;
+  uint32_t n = nrfUart->RXD.AMOUNT;
+  if (n > UART_RX_FIFO_FLUSH_BYTES) n = 0;
+  if (n)
+  {
+    bool untouched = true;
+    for (uint32_t i = 0; i < n; i++)
+    {
+      if (rxFlush[i] != ((i & 1) ? 0x55 : 0xAA)) { untouched = false; break; }
+    }
+    if (untouched) n = 0;
+  }
+  for (uint32_t i = 0; i < n; i++)
+  {
+    rxBuffer.store_char(rxFlush[i]);
+  }
+  _rxFifoRescued += n;
+
+  // 5. Re-arm into the same buffer and restore the short. The RXSTARTED this
+  //    raises is left pending for the ISR, which queues the other buffer.
   nrfUart->RXD.PTR    = (uint32_t)rxDma[_rxIdx];
   nrfUart->RXD.MAXCNT = UART_RX_DMA_SIZE;
+  nrfUart->EVENTS_RXSTARTED = 0x0UL;
+  nrfUart->EVENTS_ENDRX     = 0x0UL;
   nrfUart->SHORTS     = UARTE_SHORTS_ENDRX_STARTRX_Msk;
   nrfUart->TASKS_STARTRX = 0x1UL;
 
   NVIC_EnableIRQ(IRQn);
+  taskEXIT_CRITICAL();
 }
 
 void Uart::rxFlushTimerCb(TimerHandle_t t)
